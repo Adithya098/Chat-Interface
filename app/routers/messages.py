@@ -1,11 +1,22 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.database import get_db
+from app.models.document import Document
 from app.models.message import Message
 from app.models.room import Room
+from app.models.user import User
 from app.schemas.message import MessageResponse
 
 router = APIRouter(prefix="/rooms/{room_id}/messages", tags=["messages"])
+
+_DOC_PREFIX = "/documents/"
+
+
+def _file_id_from_message_content(content: str) -> str | None:
+    if not content.startswith(_DOC_PREFIX):
+        return None
+    rest = content[len(_DOC_PREFIX) :].split("?")[0].strip("/")
+    return rest or None
 
 
 @router.get("/", response_model=list[MessageResponse])
@@ -19,13 +30,40 @@ def get_messages(
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
 
-    messages = (
-        db.query(Message)
+    rows = (
+        db.query(Message, User.name)
+        .join(User, Message.sender_id == User.id)
         .filter(Message.room_id == room_id)
         .order_by(Message.created_at.desc())
         .offset(offset)
         .limit(limit)
         .all()
     )
-    # Return in chronological order
-    return list(reversed(messages))
+    rows_chrono = list(reversed(rows))
+
+    file_ids = [
+        fid
+        for msg, _ in rows_chrono
+        if msg.type == "file" and (fid := _file_id_from_message_content(msg.content))
+    ]
+    filenames: dict[str, str] = {}
+    if file_ids:
+        for doc in db.query(Document).filter(Document.file_id.in_(file_ids)).all():
+            filenames[doc.file_id] = doc.original_filename
+
+    out: list[MessageResponse] = []
+    for msg, sender_name in rows_chrono:
+        fid = _file_id_from_message_content(msg.content) if msg.type == "file" else None
+        out.append(
+            MessageResponse(
+                id=msg.id,
+                room_id=msg.room_id,
+                sender_id=msg.sender_id,
+                sender_name=sender_name,
+                type=msg.type,
+                content=msg.content,
+                created_at=msg.created_at,
+                filename=filenames.get(fid) if fid else None,
+            )
+        )
+    return out
