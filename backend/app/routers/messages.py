@@ -7,7 +7,7 @@ from app.models.message import Message
 from app.models.room import Room
 from app.models.room_member import RoomMember
 from app.models.user import User
-from app.schemas.message import MessageResponse
+from app.schemas.message import MessageResponse, ReplySnippet
 
 router = APIRouter(prefix="/rooms/{room_id}/messages", tags=["messages"])
 
@@ -53,6 +53,26 @@ def get_messages(
         for doc in db.query(Document).filter(Document.file_id.in_(file_ids)).all():
             filenames[doc.file_id] = doc.original_filename
 
+    # Resolve reply snippets: gather all reply_to IDs, fetch originals in one query
+    reply_ids = [msg.reply_to for msg, _ in rows_chrono if msg.reply_to is not None]
+    reply_map: dict[int, ReplySnippet] = {}
+    if reply_ids:
+        from sqlalchemy.orm import aliased
+        OrigUser = aliased(User)
+        orig_rows = (
+            db.query(Message, OrigUser.name)
+            .join(OrigUser, Message.sender_id == OrigUser.id)
+            .filter(Message.id.in_(reply_ids))
+            .all()
+        )
+        for orig_msg, orig_name in orig_rows:
+            preview = orig_msg.content[:120]
+            reply_map[orig_msg.id] = ReplySnippet(
+                id=orig_msg.id,
+                sender_name=orig_name,
+                content=preview,
+            )
+
     out: list[MessageResponse] = []
     for msg, sender_name in rows_chrono:
         fid = _file_id_from_message_content(msg.content) if msg.type == "file" else None
@@ -66,6 +86,8 @@ def get_messages(
                 content=msg.content,
                 created_at=msg.created_at,
                 filename=filenames.get(fid) if fid else None,
+                reply_to=msg.reply_to,
+                reply_snippet=reply_map.get(msg.reply_to) if msg.reply_to else None,
             )
         )
     return out

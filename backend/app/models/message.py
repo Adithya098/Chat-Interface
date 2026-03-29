@@ -11,4 +11,5 @@ class Message(Base):
     sender_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     type = Column(String(20), nullable=False, default="text")  # text | file
     content = Column(Text, nullable=False)  # text content or file URL
+    reply_to = Column(Integer, ForeignKey("messages.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

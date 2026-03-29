@@ -36,6 +36,8 @@ export function useWebSocket() {
               type: "text",
               content: data.content,
               created_at: data.created_at,
+              reply_to: data.reply_to || null,
+              reply_snippet: data.reply_snippet || null,
             },
           });
           break;

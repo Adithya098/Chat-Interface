@@ -8,9 +8,10 @@ import "../styles/Chat.css";
 
 export default function ChatArea() {
   const { state, dispatch } = useChat();
-  const { activeRoom, messages, user, onlineUsers, typingUsers } = state;
+  const { activeRoom, messages, user, onlineUsers, typingUsers, replyingTo } = state;
   const { connect, disconnect, send } = useWebSocket();
   const messagesEndRef = useRef(null);
+  const messageInputRef = useRef(null);
   const fileInputRef = useRef(null);
   const [text, setText] = useState("");
   const [showMembers, setShowMembers] = useState(false);
@@ -20,7 +21,6 @@ export default function ChatArea() {
   // Connect WS when active room changes
   useEffect(() => {
     if (activeRoom && user) {
-      // Load message history
       api(`/rooms/${activeRoom.id}/messages/?limit=100`)
         .then((msgs) => dispatch({ type: "SET_MESSAGES", payload: msgs }))
         .catch(console.error);
@@ -51,9 +51,13 @@ export default function ChatArea() {
 
   const handleSend = () => {
     if (!text.trim()) return;
-    send({ type: "message", content: text.trim() });
+    const payload = { type: "message", content: text.trim() };
+    if (replyingTo) {
+      payload.reply_to = replyingTo.id;
+    }
+    send(payload);
     setText("");
-    // Stop typing
+    dispatch({ type: "CLEAR_REPLYING_TO" });
     if (isTypingRef.current) {
       isTypingRef.current = false;
       clearTimeout(typingTimerRef.current);
@@ -101,6 +105,30 @@ export default function ChatArea() {
     },
     [activeRoom?.id, user, dispatch]
   );
+
+  const handleReply = useCallback(
+    (msg) => {
+      dispatch({
+        type: "SET_REPLYING_TO",
+        payload: {
+          id: msg.id,
+          sender_name: msg.sender_name || `User ${msg.sender_id}`,
+          content: msg.type === "file" ? (msg.filename || "Attachment") : msg.content,
+        },
+      });
+      messageInputRef.current?.focus();
+    },
+    [dispatch]
+  );
+
+  const scrollToMessage = useCallback((messageId) => {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("msg-highlight");
+      setTimeout(() => el.classList.remove("msg-highlight"), 1500);
+    }
+  }, []);
 
   if (!activeRoom) {
     return (
@@ -159,12 +187,15 @@ export default function ChatArea() {
         {/* Messages */}
         <div className="messages-container">
           {messages.map((msg, i) => (
-            <Message
+            <MessageBubble
               key={msg.id || `sys-${i}`}
               msg={msg}
               userId={user.id}
               isAdmin={isAdmin}
+              canWrite={canWrite}
               onDelete={handleDeleteMessage}
+              onReply={handleReply}
+              onClickReply={scrollToMessage}
             />
           ))}
           <div ref={messagesEndRef} />
@@ -172,29 +203,48 @@ export default function ChatArea() {
 
         {/* Compose or read-only */}
         {canWrite ? (
-          <div className="compose-bar">
-            <label className="file-label" title="Attach file">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
-              </svg>
+          <div className="compose-section">
+            {/* Reply preview banner */}
+            {replyingTo && (
+              <div className="reply-banner">
+                <div className="reply-banner-content">
+                  <span className="reply-banner-name">{replyingTo.sender_name}</span>
+                  <span className="reply-banner-text">{replyingTo.content}</span>
+                </div>
+                <button
+                  type="button"
+                  className="reply-banner-close"
+                  onClick={() => dispatch({ type: "CLEAR_REPLYING_TO" })}
+                >
+                  ×
+                </button>
+              </div>
+            )}
+            <div className="compose-bar">
+              <label className="file-label" title="Attach file">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+                </svg>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  hidden
+                  onChange={handleFileUpload}
+                />
+              </label>
               <input
-                ref={fileInputRef}
-                type="file"
-                hidden
-                onChange={handleFileUpload}
+                ref={messageInputRef}
+                type="text"
+                className="message-input"
+                placeholder={replyingTo ? "Type your reply..." : "Type a message..."}
+                value={text}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
               />
-            </label>
-            <input
-              type="text"
-              className="message-input"
-              placeholder="Type a message..."
-              value={text}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-            />
-            <button className="send-btn" onClick={handleSend}>
-              Send
-            </button>
+              <button className="send-btn" onClick={handleSend}>
+                Send
+              </button>
+            </div>
           </div>
         ) : (
           <div className="readonly-banner">
@@ -211,7 +261,7 @@ export default function ChatArea() {
 }
 
 /* ── Single message bubble ── */
-function Message({ msg, userId, isAdmin, onDelete }) {
+function MessageBubble({ msg, userId, isAdmin, canWrite, onDelete, onReply, onClickReply }) {
   if (msg.type === "system") {
     return <div className="msg-system">{msg.content}</div>;
   }
@@ -225,7 +275,7 @@ function Message({ msg, userId, isAdmin, onDelete }) {
     : "";
 
   return (
-    <div className={`msg ${isMe ? "msg-out" : "msg-in"}`}>
+    <div id={`msg-${msg.id}`} className={`msg ${isMe ? "msg-out" : "msg-in"}`}>
       <div className="msg-body-row">
         <div className="msg-main">
           {!isMe && (
@@ -233,6 +283,18 @@ function Message({ msg, userId, isAdmin, onDelete }) {
               {msg.sender_name || `User ${msg.sender_id}`}
             </div>
           )}
+
+          {/* Quoted reply block */}
+          {msg.reply_snippet && (
+            <div
+              className="msg-reply-quote"
+              onClick={() => onClickReply(msg.reply_snippet.id)}
+            >
+              <span className="reply-quote-name">{msg.reply_snippet.sender_name}</span>
+              <span className="reply-quote-text">{msg.reply_snippet.content}</span>
+            </div>
+          )}
+
           {msg.type === "file" ? (
             <div className="text">
               <a
@@ -249,16 +311,36 @@ function Message({ msg, userId, isAdmin, onDelete }) {
           )}
           <div className="meta">{time}</div>
         </div>
-        {isAdmin && msg.id != null && (
-          <button
-            type="button"
-            className="msg-delete-btn"
-            title="Delete message"
-            aria-label="Delete message"
-            onClick={() => onDelete(msg.id)}
-          >
-            ×
-          </button>
+
+        {/* Action icons */}
+        {msg.id != null && (
+          <div className="msg-actions">
+            {canWrite && (
+              <button
+                type="button"
+                className="msg-action-btn"
+                title="Reply"
+                aria-label="Reply"
+                onClick={() => onReply(msg)}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="9 17 4 12 9 7" />
+                  <path d="M20 18v-2a4 4 0 00-4-4H4" />
+                </svg>
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                type="button"
+                className="msg-action-btn msg-action-delete"
+                title="Delete message"
+                aria-label="Delete message"
+                onClick={() => onDelete(msg.id)}
+              >
+                ×
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>

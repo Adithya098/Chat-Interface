@@ -71,25 +71,42 @@ async def websocket_endpoint(
                 # Save message to DB
                 msg_db = SessionLocal()
                 try:
+                    reply_to_id = data.get("reply_to")
+                    # Build reply snippet if replying
+                    reply_snippet = None
+                    if reply_to_id is not None:
+                        orig = msg_db.query(Message).filter(Message.id == reply_to_id).first()
+                        if orig:
+                            orig_user = msg_db.query(User).filter(User.id == orig.sender_id).first()
+                            reply_snippet = {
+                                "id": orig.id,
+                                "sender_name": orig_user.name if orig_user else f"User {orig.sender_id}",
+                                "content": orig.content[:120],
+                            }
+
                     db_msg = Message(
                         room_id=room_id,
                         sender_id=user_id,
                         type="text",
                         content=data.get("content", ""),
+                        reply_to=reply_to_id,
                     )
                     msg_db.add(db_msg)
                     msg_db.commit()
                     msg_db.refresh(db_msg)
 
                     # Broadcast with DB id and timestamp
-                    await manager.broadcast(room_id, {
+                    broadcast_payload = {
                         "type": "message",
                         "id": db_msg.id,
                         "sender_id": user_id,
                         "sender_name": user_name,
                         "content": db_msg.content,
                         "created_at": db_msg.created_at.isoformat(),
-                    })
+                        "reply_to": reply_to_id,
+                        "reply_snippet": reply_snippet,
+                    }
+                    await manager.broadcast(room_id, broadcast_payload)
                 finally:
                     msg_db.close()
 

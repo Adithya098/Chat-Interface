@@ -21,6 +21,7 @@ function getInitialState() {
     messages: [],
     onlineUsers: [],
     typingUsers: {},
+    replyingTo: null,
   };
 }
 
@@ -38,7 +39,7 @@ function reducer(state, action) {
       return { ...state, rooms: action.payload };
 
     case "SET_ACTIVE_ROOM":
-      return { ...state, activeRoom: action.payload, messages: [], onlineUsers: [], typingUsers: {} };
+      return { ...state, activeRoom: action.payload, messages: [], onlineUsers: [], typingUsers: {}, replyingTo: null };
 
     case "SET_MESSAGES":
       return { ...state, messages: action.payload };
@@ -53,6 +54,12 @@ function reducer(state, action) {
           (m) => m.id == null || Number(m.id) !== Number(action.payload)
         ),
       };
+
+    case "SET_REPLYING_TO":
+      return { ...state, replyingTo: action.payload };
+
+    case "CLEAR_REPLYING_TO":
+      return { ...state, replyingTo: null };
 
     case "SET_ONLINE_USERS":
       return { ...state, onlineUsers: action.payload };
