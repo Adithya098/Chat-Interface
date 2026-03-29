@@ -27,11 +27,38 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   padding: 12px 20px;
   background: var(--bg-panel);
   border-bottom: 1px solid var(--border);
 }
-.chat-header h2 { font-size: 1rem; }
+.chat-header h2 { font-size: 1rem; flex: 1; min-width: 0; }
+
+.chat-back-btn {
+  display: none;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  line-height: 1;
+  background: var(--bg-input);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.chat-back-btn:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
+@media (max-width: 768px) {
+  .chat-back-btn {
+    display: inline-flex;
+  }
+}
 .chat-header-right { display: flex; align-items: center; gap: 10px; }
 .online-count { font-size: 0.8rem; color: var(--text-muted); }
 .members-btn {

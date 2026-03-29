@@ -1,15 +1,28 @@
-import { createContext, useContext, useReducer, useCallback } from "react";
+import { createContext, useContext, useReducer } from "react";
 
 const ChatContext = createContext(null);
 
-const initialState = {
-  user: JSON.parse(localStorage.getItem("chat_user") || "null"),
-  rooms: [],          // all rooms with membership info
-  activeRoom: null,   // { id, name, role, status }
-  messages: [],
-  onlineUsers: [],
-  typingUsers: {},    // { userName: timeoutId }
-};
+function loadStoredUser() {
+  try {
+    const raw = localStorage.getItem("chat_user");
+    if (raw == null || raw === "") return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function getInitialState() {
+  return {
+    user: loadStoredUser(),
+    rooms: [],
+    activeRoom: null,
+    messages: [],
+    onlineUsers: [],
+    typingUsers: {},
+  };
+}
 
 function reducer(state, action) {
   switch (action.type) {
@@ -19,7 +32,7 @@ function reducer(state, action) {
 
     case "LOGOUT":
       localStorage.removeItem("chat_user");
-      return { ...initialState, user: null };
+      return { ...getInitialState(), user: null };
 
     case "SET_ROOMS":
       return { ...state, rooms: action.payload };
@@ -60,7 +73,7 @@ function reducer(state, action) {
 }
 
 export function ChatProvider({ children }) {
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const [state, dispatch] = useReducer(reducer, undefined, getInitialState);
   return (
     <ChatContext.Provider value={{ state, dispatch }}>
       {children}

@@ -7,13 +7,16 @@ from app.schemas.user import UserCreate, UserResponse
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-@router.post("/", response_model=UserResponse, status_code=201)
+@router.post("/", response_model=UserResponse)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
-    existing = db.query(User).filter(User.email == user.email).first()
+    normalized_email = str(user.email).strip().lower()
+    normalized_name = user.name.strip()
+    existing = db.query(User).filter(User.email == normalized_email).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
+        # Auth flow is "sign in or create": return existing user if email already exists.
+        return existing
 
-    db_user = User(name=user.name, email=user.email)
+    db_user = User(name=normalized_name, email=normalized_email)
     db.add(db_user)
     db.commit()
     db.refresh(db_user)

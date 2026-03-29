@@ -22,8 +22,11 @@ function AppInner() {
     return <LoginScreen />;
   }
 
+  const layoutClass =
+    state.activeRoom != null ? "app-layout chat-open" : "app-layout";
+
   return (
-    <div className="app-layout">
+    <div className={layoutClass}>
       <Sidebar onEnterRoom={handleEnterRoom} />
       <ChatArea />
     </div>

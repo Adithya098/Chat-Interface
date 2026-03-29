@@ -19,11 +19,6 @@ export default defineConfig({
       '/rooms':     proxyToApi,
       '/documents': proxyToApi,
       '/files':     proxyToApi,
-      '/ws': {
-        target: `ws://127.0.0.1:${API_PORT}`,
-        ws: true,
-        changeOrigin: true,
-      },
     },
   },
 })

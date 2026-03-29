@@ -1,3 +1,4 @@
+import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -8,6 +9,21 @@ from fastapi.responses import FileResponse
 from app.database import engine, Base
 import app.models  # noqa: F401 — register all models (including Document) for metadata.create_all
 from app.routers import users, rooms, members, ws, messages, files
+
+
+class SuppressWebSocketLifecycleLogs(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        return not (
+            ('"WebSocket ' in message and "[accepted]" in message)
+            or message == "connection open"
+            or message == "connection closed"
+        )
+
+
+# Suppress noisy websocket lifecycle logs without hiding real backend errors.
+logging.getLogger("uvicorn.error").addFilter(SuppressWebSocketLifecycleLogs())
+logging.getLogger("websockets.server").setLevel(logging.WARNING)
 
 # In production, serve the React build output; in dev, use Vite dev server with proxy
 FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"

@@ -85,6 +85,23 @@ export default function ChatArea() {
     e.target.value = "";
   };
 
+  const handleDeleteMessage = useCallback(
+    async (messageId) => {
+      if (!activeRoom || !user) return;
+      if (!window.confirm("Delete this message for everyone in the room?")) return;
+      try {
+        await api(
+          `/rooms/${activeRoom.id}/messages/${messageId}?admin_id=${user.id}`,
+          { method: "DELETE" }
+        );
+        dispatch({ type: "REMOVE_MESSAGE", payload: messageId });
+      } catch (err) {
+        alert(err.message);
+      }
+    },
+    [activeRoom?.id, user, dispatch]
+  );
+
   if (!activeRoom) {
     return (
       <main className="chat-area">
@@ -97,23 +114,6 @@ export default function ChatArea() {
 
   const canWrite = activeRoom.role === "write" || activeRoom.role === "admin";
   const isAdmin = activeRoom.role === "admin";
-
-  const handleDeleteMessage = useCallback(
-    async (messageId) => {
-      if (!isAdmin || !user) return;
-      if (!window.confirm("Delete this message for everyone in the room?")) return;
-      try {
-        await api(
-          `/rooms/${activeRoom.id}/messages/${messageId}?admin_id=${user.id}`,
-          { method: "DELETE" }
-        );
-        dispatch({ type: "REMOVE_MESSAGE", payload: messageId });
-      } catch (err) {
-        alert(err.message);
-      }
-    },
-    [activeRoom?.id, isAdmin, user, dispatch]
-  );
   const typingNames = Object.keys(typingUsers);
   const typingLabel =
     typingNames.length === 1
@@ -129,6 +129,15 @@ export default function ChatArea() {
       <div className="chat-view">
         {/* Header */}
         <div className="chat-header">
+          <button
+            type="button"
+            className="chat-back-btn"
+            title="Back to rooms"
+            aria-label="Back to rooms"
+            onClick={() => dispatch({ type: "SET_ACTIVE_ROOM", payload: null })}
+          >
+            ←
+          </button>
           <h2>{activeRoom.name}</h2>
           <div className="chat-header-right">
             <span className={`badge badge-${activeRoom.role}`}>{activeRoom.role}</span>
