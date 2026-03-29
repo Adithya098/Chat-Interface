@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
+import app.models  # noqa: F401 — register all models (including Document) for metadata.create_all
 from app.routers import users, rooms, members, ws, messages, files
 
 

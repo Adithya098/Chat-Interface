@@ -109,7 +109,7 @@ async def websocket_endpoint(
 
             elif msg_type == "file":
                 # Client sends this after REST upload to notify the room
-                # {"type": "file", "file_url": "/files/abc.png", "filename": "photo.png", "message_id": 5}
+                # {"type": "file", "file_url": "/documents/<file_id>", "filename": "<original name>", "message_id": 5}
                 role = member.role
                 if role not in ("write", "admin"):
                     await manager.send_to_user(room_id, user_id, {
