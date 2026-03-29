@@ -6,8 +6,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine.url import URL
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-# Resolve .env from project root so DATABASE_URL loads even if cwd differs
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+# Repo root: backend/app -> .. -> backend -> ..
+load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
 
 def _database_url():
@@ -35,7 +35,11 @@ def _database_url():
     return os.getenv("DATABASE_URL", "postgresql://localhost:5432/chatdb")
 
 
-engine = create_engine(_database_url())
+engine = create_engine(
+    _database_url(),
+    pool_pre_ping=True,
+    connect_args={"connect_timeout": 15},
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

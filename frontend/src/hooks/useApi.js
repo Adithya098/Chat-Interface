@@ -1,13 +1,47 @@
-const BASE = "";  // same origin — Vite proxy handles it in dev
+import { API_BASE } from "../config.js";
+
+const BASE = API_BASE;
+
+const API_TIMEOUT_MS = 30_000;
+
+function formatDetail(detail) {
+  if (detail == null || detail === "") return "";
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail))
+    return detail.map((x) => (typeof x?.msg === "string" ? x.msg : JSON.stringify(x))).join("; ");
+  if (typeof detail === "object" && typeof detail.msg === "string") return detail.msg;
+  try {
+    return JSON.stringify(detail);
+  } catch {
+    return String(detail);
+  }
+}
+
+async function fetchWithTimeout(url, opts = {}) {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...opts, signal: controller.signal });
+  } catch (e) {
+    if (e.name === "AbortError") {
+      throw new Error(
+        "Request timed out. Is the API running (port 8000)? Open the URL Vite prints (e.g. :3001 if 3000 is busy)."
+      );
+    }
+    throw e;
+  } finally {
+    clearTimeout(t);
+  }
+}
 
 export async function api(path, opts = {}) {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetchWithTimeout(`${BASE}${path}`, {
     headers: { "Content-Type": "application/json", ...opts.headers },
     ...opts,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || res.statusText);
+    throw new Error(formatDetail(err.detail) || res.statusText);
   }
   return res.json();
 }
@@ -17,13 +51,13 @@ export async function uploadFile(roomId, userId, file) {
   form.append("user_id", userId);
   form.append("file", file);
 
-  const res = await fetch(`${BASE}/rooms/${roomId}/upload`, {
+  const res = await fetchWithTimeout(`${BASE}/rooms/${roomId}/upload`, {
     method: "POST",
     body: form,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || "Upload failed");
+    throw new Error(formatDetail(err.detail) || "Upload failed");
   }
   return res.json();
 }

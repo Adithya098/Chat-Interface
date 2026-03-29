@@ -21,28 +21,22 @@ Real-time chat backend built with FastAPI, WebSockets, and PostgreSQL (AWS RDS).
 ## Project Structure
 
 ```
-app/
-├── main.py               # App entry point, middleware
-├── database.py           # SQLAlchemy engine + session
-├── connection_manager.py # In-memory WebSocket manager
-├── models/               # DB models: User, Room, RoomMember, Message
-├── schemas/              # Pydantic schemas
-└── routers/
-    ├── users.py          # User CRUD
-    ├── rooms.py          # Room CRUD
-    ├── members.py        # Join / approve / reject
-    ├── messages.py       # Message history
-    ├── files.py          # File upload + serve
-    └── ws.py             # WebSocket endpoint
+Chat-Interface/               # repo root (.env, package.json, runtime.txt)
+├── backend/
+│   ├── app/                  # FastAPI package (main, database, models, schemas, routers)
+│   ├── scripts/              # e.g. seed_dummy_data
+│   ├── uploads/              # Local file storage (non-Supabase)
+│   └── requirements.txt
+└── frontend/                 # React + Vite
 ```
 
 ## Setup
 
 ```bash
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 npm install               # root: installs concurrently for `npm run dev`
 cd frontend && npm install && cd ..
-cp .env.example .env      # if present; otherwise create .env (see below)
+cp .env.example .env      # if present; otherwise create .env at repo root (see below)
 ```
 
 **Development (API + Vite together):**
@@ -51,13 +45,13 @@ cp .env.example .env      # if present; otherwise create .env (see below)
 npm run dev
 ```
 
-- Open the app at **http://localhost:3000** (Vite proxies API/WebSocket to port 8000).
+- Open the URL Vite prints (default **http://localhost:3000**). In dev, the UI talks to the API at **http://127.0.0.1:8000** directly (so it still works if Vite uses **3001**). Ensure the API process from `npm run dev` is running.
 - API docs: http://localhost:8000/docs
 
 **Backend only** (serves built `frontend/dist` if present):
 
 ```bash
-python -m uvicorn app.main:app --reload
+cd backend && python -m uvicorn app.main:app --reload
 ```
 
 ## API Overview

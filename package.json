@@ -2,7 +2,7 @@
   "name": "chat-interface",
   "private": true,
   "scripts": {
-    "dev": "concurrently -k -n api,web -c cyan,magenta \"python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000\" \"npm run dev --prefix frontend\""
+    "dev": "concurrently -k -n api,web -c cyan,magenta \"python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000 --app-dir backend --reload-dir backend\" \"npm run dev --prefix frontend\""
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

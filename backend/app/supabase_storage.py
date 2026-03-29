@@ -11,7 +11,7 @@ from supabase import Client, create_client
 logger = logging.getLogger(__name__)
 
 # Ensure .env is loaded before reading Supabase vars (covers import orders without app.database)
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
 _client: Optional[Client] = None
 

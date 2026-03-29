@@ -2,8 +2,8 @@
 Insert demo users, rooms, members, messages, and documents.
 Idempotent: skips if demo user alice@chat-demo.local already exists.
 
-Run from project root:
-  python -m scripts.seed_dummy_data
+Run from backend/ (so package app resolves):
+  cd backend && python -m scripts.seed_dummy_data
 """
 import uuid
 

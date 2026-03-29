@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// Match uvicorn --host 127.0.0.1; "localhost" on Windows can resolve to ::1 and break the proxy.
-const API_ORIGIN = 'http://127.0.0.1:8000'
+// Backend port — must match uvicorn's --port flag.
+const API_PORT = process.env.API_PORT || 8000
+const API_ORIGIN = `http://127.0.0.1:${API_PORT}`
 
 const proxyToApi = {
   target: API_ORIGIN,
@@ -14,12 +15,12 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      '/users': proxyToApi,
-      '/rooms': proxyToApi,
+      '/users':     proxyToApi,
+      '/rooms':     proxyToApi,
       '/documents': proxyToApi,
-      '/files': proxyToApi,
+      '/files':     proxyToApi,
       '/ws': {
-        target: 'ws://127.0.0.1:8000',
+        target: `ws://127.0.0.1:${API_PORT}`,
         ws: true,
         changeOrigin: true,
       },

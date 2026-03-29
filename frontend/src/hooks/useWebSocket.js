@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useChat } from "../context/ChatContext";
+import { wsUrl } from "../config.js";
 
 export function useWebSocket() {
   const { state, dispatch } = useChat();
@@ -14,9 +15,7 @@ export function useWebSocket() {
     }
     clearTimeout(reconnectTimer.current);
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = window.location.host;
-    const url = `${protocol}//${host}/ws/${roomId}?user_id=${userId}`;
+    const url = wsUrl(`/ws/${roomId}?user_id=${userId}`);
 
     const socket = new WebSocket(url);
     wsRef.current = socket;

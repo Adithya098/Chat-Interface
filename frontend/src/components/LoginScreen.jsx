@@ -3,6 +3,11 @@ import { useChat } from "../context/ChatContext";
 import { api } from "../hooks/useApi";
 import "../styles/Login.css";
 
+function isDuplicateEmailError(message) {
+  const m = String(message || "").toLowerCase();
+  return m.includes("already registered") || m.includes("email already");
+}
+
 export default function LoginScreen() {
   const { dispatch } = useChat();
   const [name, setName] = useState("");
@@ -26,8 +31,8 @@ export default function LoginScreen() {
           method: "POST",
           body: JSON.stringify({ name: name.trim(), email: email.trim() }),
         });
-      } catch {
-        // User likely already exists — find by email
+      } catch (e) {
+        if (!isDuplicateEmailError(e.message)) throw e;
         const users = await api("/users/");
         user = users.find((u) => u.email === email.trim());
         if (!user) throw new Error("Could not find or create user");

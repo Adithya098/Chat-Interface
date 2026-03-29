@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useChat } from "../context/ChatContext";
+import { API_BASE } from "../config.js";
 import { api, uploadFile } from "../hooks/useApi";
 import { useWebSocket } from "../hooks/useWebSocket";
 import MembersPanel from "./MembersPanel";
@@ -201,7 +202,7 @@ function Message({ msg, userId }) {
         <div className="text">
           <a
             className="file-link"
-            href={`${msg.content}?user_id=${userId}`}
+            href={`${API_BASE}${msg.content}?user_id=${userId}`}
             target="_blank"
             rel="noreferrer"
           >

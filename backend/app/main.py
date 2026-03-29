@@ -10,7 +10,7 @@ import app.models  # noqa: F401 — register all models (including Document) for
 from app.routers import users, rooms, members, ws, messages, files
 
 # In production, serve the React build output; in dev, use Vite dev server with proxy
-FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 
 
 @asynccontextmanager
@@ -22,12 +22,30 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Chat Backend", version="1.0.0", lifespan=lifespan)
 
-# CORS — allow all in dev, restrict in production via env var
-allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+# CORS — dev often uses Vite on localhost:* while the API is on 127.0.0.1:8000 (different origins).
+# Set ALLOWED_ORIGINS in production (comma-separated). Use * only if you do not need credentials.
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "").strip()
+if _raw_origins == "*":
+    allowed_origins = ["*"]
+elif _raw_origins:
+    allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+elif os.getenv("RENDER", "").lower() in ("true", "1", "yes") or os.getenv("DYNO"):
+    # Hosted API: allow any origin unless you set ALLOWED_ORIGINS to a stricter list.
+    allowed_origins = ["*"]
+else:
+    allowed_origins = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+        "http://127.0.0.1:5173",
+    ]
+_allow_credentials = "*" not in allowed_origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_credentials=True,
+    allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
