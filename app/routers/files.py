@@ -1,53 +1,29 @@
+import logging
 import os
 import uuid
 import mimetypes
-from typing import Optional
-
-import boto3
-from botocore.exceptions import ClientError
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
+from storage3.exceptions import StorageApiError
+
 from app.database import get_db
 from app.models.room import Room
 from app.models.room_member import RoomMember
 from app.models.message import Message
 from app.models.document import Document
+from app import supabase_storage
 
 router = APIRouter(tags=["files"])
+logger = logging.getLogger(__name__)
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
 ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".pdf", ".txt", ".doc", ".docx", ".csv", ".zip"}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 
 
-def _s3_client():
-    region = os.getenv("AWS_REGION", "us-east-1")
-    return boto3.client("s3", region_name=region)
-
-
-def _build_s3_https_url(bucket: str, key: str, region: str) -> str:
-    if region == "us-east-1":
-        return f"https://{bucket}.s3.amazonaws.com/{key}"
-    return f"https://{bucket}.s3.{region}.amazonaws.com/{key}"
-
-
-def _upload_bytes_to_s3(
-    bucket: str,
-    key: str,
-    body: bytes,
-    content_type: Optional[str],
-    original_filename: str,
-) -> str:
-    client = _s3_client()
-    region = os.getenv("AWS_REGION", "us-east-1")
-    extra = {
-        "Metadata": {"original-filename": original_filename[:1024]},
-    }
-    if content_type:
-        extra["ContentType"] = content_type
-    client.put_object(Bucket=bucket, Key=key, Body=body, **extra)
-    return _build_s3_https_url(bucket, key, region)
+def _use_supabase_storage() -> bool:
+    return supabase_storage.storage_configured()
 
 
 def _approved_room_member(db: Session, room_id: int, user_id: int, need_write: bool = False):
@@ -88,18 +64,31 @@ def upload_file(
     file_id = str(uuid.uuid4())
     stored_suffix = f"{file_id}{ext}"
     content_type, _ = mimetypes.guess_type(original_name)
-    bucket = os.getenv("AWS_S3_BUCKET", "").strip()
 
-    s3_url = None
-    s3_key = None
+    storage_bucket = None
+    storage_path = None
+    storage_public_url = None
 
-    if bucket:
-        s3_key = f"rooms/{room_id}/{stored_suffix}"
+    if _use_supabase_storage():
+        bucket = supabase_storage.storage_bucket_name()
+        storage_path = f"rooms/{room_id}/{stored_suffix}"
         try:
-            s3_url = _upload_bytes_to_s3(bucket, s3_key, contents, content_type, original_name)
-        except ClientError as e:
-            raise HTTPException(status_code=502, detail=f"S3 upload failed: {e}") from e
+            supabase_storage.upload_bytes(bucket, storage_path, contents, content_type)
+        except StorageApiError as e:
+            raise HTTPException(status_code=502, detail=f"Storage upload failed: {e}") from e
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Storage upload failed: {e}") from e
+        storage_bucket = bucket
+        if os.getenv("SUPABASE_STORAGE_PUBLIC_URLS", "").strip().lower() in ("1", "true", "yes"):
+            storage_public_url = supabase_storage.public_object_url(bucket, storage_path)
     else:
+        if supabase_storage.storage_env_ready():
+            logger.warning(
+                "Supabase env is set but Storage is not active: %s",
+                supabase_storage.why_storage_disabled(),
+            )
+        else:
+            logger.info("Saving upload to local disk (Supabase Storage not configured).")
         os.makedirs(UPLOAD_DIR, exist_ok=True)
         file_path = os.path.join(UPLOAD_DIR, stored_suffix)
         with open(file_path, "wb") as f:
@@ -110,8 +99,9 @@ def upload_file(
         room_id=room_id,
         sender_id=user_id,
         original_filename=original_name,
-        s3_url=s3_url,
-        s3_key=s3_key,
+        storage_bucket=storage_bucket,
+        storage_path=storage_path,
+        storage_public_url=storage_public_url,
     )
     db.add(doc)
     db.flush()
@@ -133,7 +123,10 @@ def upload_file(
         "file_id": doc.file_id,
         "file_url": file_url,
         "filename": doc.original_filename,
-        "s3_url": doc.s3_url,
+        "storage_bucket": doc.storage_bucket,
+        "storage_path": doc.storage_path,
+        "storage_public_url": doc.storage_public_url,
+        "storage_backend": "supabase" if doc.storage_bucket else "local",
         "created_at": db_msg.created_at.isoformat(),
     }
 
@@ -161,7 +154,9 @@ def list_room_documents(
             "original_filename": d.original_filename,
             "sender_id": d.sender_id,
             "open_url": f"/documents/{d.file_id}",
-            "s3_url": d.s3_url,
+            "storage_bucket": d.storage_bucket,
+            "storage_path": d.storage_path,
+            "storage_public_url": d.storage_public_url,
             "created_at": d.created_at.isoformat(),
         }
         for d in rows
@@ -181,19 +176,22 @@ def open_document(
     if not _approved_room_member(db, doc.room_id, user_id, need_write=False):
         raise HTTPException(status_code=403, detail="Not authorized to open this document")
 
-    bucket = os.getenv("AWS_S3_BUCKET", "").strip()
-    if doc.s3_key and bucket:
-        try:
-            client = _s3_client()
-            expires = int(os.getenv("S3_PRESIGN_EXPIRES_SECONDS", "3600"))
-            url = client.generate_presigned_url(
-                "get_object",
-                Params={"Bucket": bucket, "Key": doc.s3_key},
-                ExpiresIn=expires,
+    if doc.storage_bucket and doc.storage_path:
+        if not _use_supabase_storage():
+            raise HTTPException(
+                status_code=503,
+                detail="File is in Supabase Storage but SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / bucket are not configured",
             )
+        expires = int(os.getenv("SUPABASE_SIGNED_URL_EXPIRES_SECONDS", "3600"))
+        try:
+            url = supabase_storage.signed_download_url(
+                doc.storage_bucket, doc.storage_path, expires
+            )
+            if not url:
+                raise HTTPException(status_code=502, detail="Could not create signed download URL")
             return RedirectResponse(url=url)
-        except ClientError as e:
-            raise HTTPException(status_code=502, detail=f"Could not generate download URL: {e}") from e
+        except StorageApiError as e:
+            raise HTTPException(status_code=502, detail=f"Could not create download URL: {e}") from e
 
     _, ext = os.path.splitext(doc.original_filename)
     ext = ext.lower()

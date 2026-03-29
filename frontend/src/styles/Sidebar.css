@@ -16,8 +16,28 @@
   border-bottom: 1px solid var(--border);
 }
 
-.user-info { display: flex; align-items: center; gap: 8px; }
-.user-name { font-weight: 600; }
+.user-info { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.user-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.sidebar-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.logout-btn {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+.logout-btn:hover {
+  background: var(--bg-input);
+  color: var(--text);
+}
 
 .create-room-btn {
   width: 36px;

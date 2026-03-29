@@ -72,15 +72,29 @@ export default function Sidebar({ onEnterRoom }) {
     return null;
   };
 
+  const handleLogout = () => {
+    dispatch({ type: "LOGOUT" });
+  };
+
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
         <div className="user-info">
           <span className="user-name">{user.name}</span>
         </div>
-        <button className="create-room-btn" onClick={() => setShowCreate(true)} title="Create room">
-          +
-        </button>
+        <div className="sidebar-header-actions">
+          <button
+            type="button"
+            className="logout-btn"
+            onClick={handleLogout}
+            title="Sign out and log in as someone else"
+          >
+            Log out
+          </button>
+          <button className="create-room-btn" onClick={() => setShowCreate(true)} title="Create room">
+            +
+          </button>
+        </div>
       </div>
 
       <div className="search-bar">
