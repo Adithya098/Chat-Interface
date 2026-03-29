@@ -7,6 +7,7 @@ export function useWebSocket() {
   const wsRef = useRef(null);
   const reconnectTimer = useRef(null);
   const skipReconnectRef = useRef(false);
+  const typingTimers = useRef({});
 
   const connect = useCallback((roomId, userId) => {
     // Clean up previous
@@ -58,14 +59,27 @@ export function useWebSocket() {
           break;
 
         case "typing":
+          window.dispatchEvent(
+            new CustomEvent("chat-ws-debug", {
+              detail: { direction: "in", type: "typing", user: data.user_name, at: Date.now() },
+            })
+          );
+          console.log("[WS] typing received from", data.user_name);
           dispatch({ type: "ADD_TYPING", payload: data.user_name });
-          // Auto-clear after 3s in case stop_typing never arrives
-          setTimeout(() => {
+          // Keep indicator visible long enough to be noticeable on receiver
+          clearTimeout(typingTimers.current[data.user_name]);
+          typingTimers.current[data.user_name] = setTimeout(() => {
             dispatch({ type: "REMOVE_TYPING", payload: data.user_name });
-          }, 3000);
+            delete typingTimers.current[data.user_name];
+          }, 10000);
           break;
 
         case "stop_typing":
+          window.dispatchEvent(
+            new CustomEvent("chat-ws-debug", {
+              detail: { direction: "in", type: "stop_typing", user: data.user_name, at: Date.now() },
+            })
+          );
           dispatch({ type: "REMOVE_TYPING", payload: data.user_name });
           break;
 
@@ -129,8 +143,26 @@ export function useWebSocket() {
   }, []);
 
   const send = useCallback((data) => {
+    if (data?.type === "typing" || data?.type === "stop_typing") {
+      window.dispatchEvent(
+        new CustomEvent("chat-ws-debug", {
+          detail: { direction: "out", type: data.type, at: Date.now() },
+        })
+      );
+    }
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(data));
+    } else if (data?.type === "typing" || data?.type === "stop_typing") {
+      window.dispatchEvent(
+        new CustomEvent("chat-ws-debug", {
+          detail: {
+            direction: "drop",
+            type: data.type,
+            at: Date.now(),
+            readyState: wsRef.current?.readyState ?? -1,
+          },
+        })
+      );
     }
   }, []);
 

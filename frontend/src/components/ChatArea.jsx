@@ -15,7 +15,10 @@ export default function ChatArea() {
   const fileInputRef = useRef(null);
   const [text, setText] = useState("");
   const [showMembers, setShowMembers] = useState(false);
+  const [wsTypingInDebug, setWsTypingInDebug] = useState("idle");
+  const [lastTypingUser, setLastTypingUser] = useState(null);
   const typingTimerRef = useRef(null);
+  const typingHeartbeatRef = useRef(0);
   const isTypingRef = useRef(false);
 
   // Connect WS when active room changes
@@ -35,18 +38,38 @@ export default function ChatArea() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  useEffect(() => {
+    const onWsDebug = (event) => {
+      const d = event.detail || {};
+      if (!d.type || (d.type !== "typing" && d.type !== "stop_typing")) return;
+      const when = new Date(d.at || Date.now()).toLocaleTimeString();
+      const who = d.user ? ` (${d.user})` : "";
+      const rs = d.readyState != null ? ` rs=${d.readyState}` : "";
+      const line = `${d.direction}:${d.type}${who}${rs} @ ${when}`;
+      if (d.direction === "in") {
+        if (d.user) setLastTypingUser(d.user);
+        setWsTypingInDebug(line);
+      }
+    };
+    window.addEventListener("chat-ws-debug", onWsDebug);
+    return () => window.removeEventListener("chat-ws-debug", onWsDebug);
+  }, []);
+
   // Typing events
   const handleInputChange = (e) => {
     setText(e.target.value);
-    if (!isTypingRef.current) {
+    const now = Date.now();
+    if (!isTypingRef.current || now - typingHeartbeatRef.current > 900) {
       isTypingRef.current = true;
+      typingHeartbeatRef.current = now;
       send({ type: "typing" });
     }
     clearTimeout(typingTimerRef.current);
     typingTimerRef.current = setTimeout(() => {
       isTypingRef.current = false;
+      typingHeartbeatRef.current = 0;
       send({ type: "stop_typing" });
-    }, 2000);
+    }, 10000);
   };
 
   const handleSend = () => {
@@ -60,6 +83,16 @@ export default function ChatArea() {
     dispatch({ type: "CLEAR_REPLYING_TO" });
     if (isTypingRef.current) {
       isTypingRef.current = false;
+      typingHeartbeatRef.current = 0;
+      clearTimeout(typingTimerRef.current);
+      send({ type: "stop_typing" });
+    }
+  };
+
+  const handleInputBlur = () => {
+    if (isTypingRef.current) {
+      isTypingRef.current = false;
+      typingHeartbeatRef.current = 0;
       clearTimeout(typingTimerRef.current);
       send({ type: "stop_typing" });
     }
@@ -143,6 +176,7 @@ export default function ChatArea() {
   const canWrite = activeRoom.role === "write" || activeRoom.role === "admin";
   const isAdmin = activeRoom.role === "admin";
   const typingNames = Object.keys(typingUsers);
+  const typingDebugText = typingNames.length ? typingNames.join(", ") : (lastTypingUser || "none");
   const typingLabel =
     typingNames.length === 1
       ? `${typingNames[0]} is typing...`
@@ -155,6 +189,12 @@ export default function ChatArea() {
   return (
     <main className="chat-area">
       <div className="chat-view">
+        <div className="typing-debug-panel">
+          <div>self user: {user?.name || user?.id || "unknown"}</div>
+          <div>typingUsers: {typingDebugText}</div>
+          <div>ws IN: {wsTypingInDebug}</div>
+        </div>
+
         {/* Header */}
         <div className="chat-header">
           <button
@@ -179,11 +219,6 @@ export default function ChatArea() {
           </div>
         </div>
 
-        {/* Typing indicator */}
-        {typingLabel && (
-          <div className="typing-indicator">{typingLabel}</div>
-        )}
-
         {/* Messages */}
         <div className="messages-container">
           {messages.map((msg, i) => (
@@ -200,6 +235,16 @@ export default function ChatArea() {
           ))}
           <div ref={messagesEndRef} />
         </div>
+
+        {/* Typing indicator — shown to all users regardless of role */}
+        {typingLabel && (
+          <div className="typing-indicator">
+            <span className="typing-dots">
+              <span /><span /><span />
+            </span>
+            {typingLabel}
+          </div>
+        )}
 
         {/* Compose or read-only */}
         {canWrite ? (
@@ -239,6 +284,7 @@ export default function ChatArea() {
                 placeholder={replyingTo ? "Type your reply..." : "Type a message..."}
                 value={text}
                 onChange={handleInputChange}
+                onBlur={handleInputBlur}
                 onKeyDown={handleKeyDown}
               />
               <button className="send-btn" onClick={handleSend}>

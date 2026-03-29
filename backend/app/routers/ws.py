@@ -40,9 +40,9 @@ async def websocket_endpoint(
         # 3. Connect
         await manager.connect(room_id, user_id, websocket)
 
-        # 4. Send online users list to the newly connected user
+        # 4. Broadcast online users list to everyone in the room
         online = manager.get_online_users(room_id)
-        await manager.send_to_user(room_id, user_id, {
+        await manager.broadcast(room_id, {
             "type": "online_users",
             "users": online,
         })
@@ -111,18 +111,20 @@ async def websocket_endpoint(
                     msg_db.close()
 
             elif msg_type == "typing":
+                print(f"[WS][typing-in] room={room_id} user_id={user_id} user_name={user_name}", flush=True)
                 await manager.broadcast(room_id, {
                     "type": "typing",
                     "user_id": user_id,
                     "user_name": user_name,
-                }, exclude_user=user_id)
+                }, exclude_websocket=websocket)
 
             elif msg_type == "stop_typing":
+                print(f"[WS][stop-typing-in] room={room_id} user_id={user_id} user_name={user_name}", flush=True)
                 await manager.broadcast(room_id, {
                     "type": "stop_typing",
                     "user_id": user_id,
                     "user_name": user_name,
-                }, exclude_user=user_id)
+                }, exclude_websocket=websocket)
 
             elif msg_type == "file":
                 # Client sends this after REST upload to notify the room
@@ -145,10 +147,20 @@ async def websocket_endpoint(
                 })
 
     except WebSocketDisconnect:
-        manager.disconnect(room_id, user_id)
+        manager.disconnect(room_id, user_id, websocket)
+        await manager.broadcast(room_id, {
+            "type": "stop_typing",
+            "user_id": user_id,
+            "user_name": user_name,
+        })
         await manager.broadcast(room_id, {
             "type": "system",
             "content": f"User {user_id} left the room",
         })
+        online = manager.get_online_users(room_id)
+        await manager.broadcast(room_id, {
+            "type": "online_users",
+            "users": online,
+        })
     except Exception:
-        manager.disconnect(room_id, user_id)
+        manager.disconnect(room_id, user_id, websocket)
