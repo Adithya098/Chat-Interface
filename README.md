@@ -40,11 +40,25 @@ app/
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env      # fill in your DATABASE_URL
-uvicorn app.main:app --reload
+npm install               # root: installs concurrently for `npm run dev`
+cd frontend && npm install && cd ..
+cp .env.example .env      # if present; otherwise create .env (see below)
 ```
 
-API docs: http://localhost:8000/docs
+**Development (API + Vite together):**
+
+```bash
+npm run dev
+```
+
+- Open the app at **http://localhost:3000** (Vite proxies API/WebSocket to port 8000).
+- API docs: http://localhost:8000/docs
+
+**Backend only** (serves built `frontend/dist` if present):
+
+```bash
+python -m uvicorn app.main:app --reload
+```
 
 ## API Overview
 

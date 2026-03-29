@@ -14,6 +14,7 @@ export default function MembersPanel({ onClose }) {
 
   const loadMembers = async () => {
     if (!activeRoom) return;
+    const admin = activeRoom.role === "admin";
     try {
       const all = await api(`/rooms/${activeRoom.id}/members`);
       const approved = all.filter((m) => m.status === "approved");
@@ -33,9 +34,11 @@ export default function MembersPanel({ onClose }) {
       }
       setNames(nameMap);
 
-      if (isAdmin) {
+      if (admin) {
         const pend = await api(`/rooms/${activeRoom.id}/pending`);
         setPending(pend);
+      } else {
+        setPending([]);
       }
     } catch (err) {
       console.error("Failed to load members", err);
@@ -44,7 +47,7 @@ export default function MembersPanel({ onClose }) {
 
   useEffect(() => {
     loadMembers();
-  }, [activeRoom?.id]);
+  }, [activeRoom?.id, activeRoom?.role]);
 
   const handleAction = async (userId, action) => {
     try {

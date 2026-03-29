@@ -7,6 +7,7 @@ export default function JoinModal({ room, onClose, onJoined }) {
   const { state } = useChat();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
 
   const handleJoin = async (role) => {
     setError("");
@@ -16,6 +17,7 @@ export default function JoinModal({ room, onClose, onJoined }) {
         method: "POST",
         body: JSON.stringify({ user_id: state.user.id, role }),
       });
+      setSent(true);
       onJoined();
     } catch (err) {
       setError(err.message);
@@ -24,31 +26,53 @@ export default function JoinModal({ room, onClose, onJoined }) {
     }
   };
 
+  const handleClose = () => {
+    onClose();
+  };
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={handleClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <h3>Join Room: {room.name}</h3>
-        <p>Select your desired role:</p>
-        <div className="role-buttons">
-          <button
-            className="role-btn"
-            onClick={() => handleJoin("read")}
-            disabled={loading}
-          >
-            Reader
-          </button>
-          <button
-            className="role-btn"
-            onClick={() => handleJoin("write")}
-            disabled={loading}
-          >
-            Writer
-          </button>
-        </div>
-        <button className="cancel-btn" onClick={onClose}>
-          Cancel
-        </button>
-        {error && <p className="error">{error}</p>}
+        {sent ? (
+          <>
+            <h3>Request sent</h3>
+            <p>
+              Your request to join <strong>{room.name}</strong> was sent to the
+              room admin. You will be able to open the room after they approve
+              it.
+            </p>
+            <button type="button" className="role-btn" onClick={handleClose}>
+              OK
+            </button>
+          </>
+        ) : (
+          <>
+            <h3>Join Room: {room.name}</h3>
+            <p>Request access as a reader or writer. An admin must approve.</p>
+            <div className="role-buttons">
+              <button
+                type="button"
+                className="role-btn"
+                onClick={() => handleJoin("read")}
+                disabled={loading}
+              >
+                Reader
+              </button>
+              <button
+                type="button"
+                className="role-btn"
+                onClick={() => handleJoin("write")}
+                disabled={loading}
+              >
+                Writer
+              </button>
+            </div>
+            <button type="button" className="cancel-btn" onClick={handleClose}>
+              Cancel
+            </button>
+            {error && <p className="error">{error}</p>}
+          </>
+        )}
       </div>
     </div>
   );

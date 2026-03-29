@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useChat } from "../context/ChatContext";
 import { api } from "../hooks/useApi";
 import JoinModal from "./JoinModal";
 import CreateRoomModal from "./CreateRoomModal";
+import AdminJoinRequestsModal from "./AdminJoinRequestsModal";
 import "../styles/Sidebar.css";
 
 export default function Sidebar({ onEnterRoom }) {
@@ -11,15 +12,21 @@ export default function Sidebar({ onEnterRoom }) {
   const [search, setSearch] = useState("");
   const [joinTarget, setJoinTarget] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [adminPendingBundles, setAdminPendingBundles] = useState([]);
+  const [roomPendingCount, setRoomPendingCount] = useState({});
+  const [showAdminJoinModal, setShowAdminJoinModal] = useState(false);
+  const autoShownPendingIdsRef = useRef(new Set());
 
   const loadRooms = useCallback(async () => {
+    if (!user) return;
+    const myId = Number(user.id);
     try {
       const allRooms = await api("/rooms/");
       const enriched = await Promise.all(
         allRooms.map(async (room) => {
           try {
             const members = await api(`/rooms/${room.id}/members`);
-            const me = members.find((m) => m.user_id === user.id);
+            const me = members.find((m) => Number(m.user_id) === myId);
             return { ...room, membership: me || null };
           } catch {
             return { ...room, membership: null };
@@ -35,6 +42,87 @@ export default function Sidebar({ onEnterRoom }) {
   useEffect(() => {
     loadRooms();
   }, [loadRooms]);
+
+  // Pick up admin approvals without a full reload (DB was already updated).
+  useEffect(() => {
+    if (!user) return undefined;
+    const refresh = () => {
+      loadRooms();
+    };
+    window.addEventListener("focus", refresh);
+    const onVis = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [user, loadRooms]);
+
+  const hasPendingMembership = rooms.some(
+    (r) => r.membership?.status === "pending"
+  );
+
+  useEffect(() => {
+    if (!user || !hasPendingMembership) return undefined;
+    const t = setInterval(() => {
+      loadRooms();
+    }, 10000);
+    return () => clearInterval(t);
+  }, [user, hasPendingMembership, loadRooms]);
+
+  const fetchAdminJoinRequests = useCallback(async () => {
+    if (!user) return;
+    const adminRooms = rooms.filter(
+      (r) =>
+        r.membership?.role === "admin" &&
+        r.membership?.status === "approved"
+    );
+    if (adminRooms.length === 0) {
+      setAdminPendingBundles([]);
+      setRoomPendingCount({});
+      return;
+    }
+    const bundles = [];
+    const counts = {};
+    for (const room of adminRooms) {
+      try {
+        const pend = await api(`/rooms/${room.id}/pending`);
+        counts[room.id] = pend.length;
+        if (pend.length) bundles.push({ room, pending: pend });
+      } catch (e) {
+        console.error(e);
+        counts[room.id] = 0;
+      }
+    }
+    setAdminPendingBundles(bundles);
+    setRoomPendingCount(counts);
+
+    if (bundles.length === 0) {
+      setShowAdminJoinModal(false);
+      return;
+    }
+
+    const ids = bundles.flatMap((b) => b.pending.map((p) => p.id));
+    const hasNew = ids.some((id) => !autoShownPendingIdsRef.current.has(id));
+    if (hasNew && ids.length > 0) {
+      ids.forEach((id) => autoShownPendingIdsRef.current.add(id));
+      setShowAdminJoinModal(true);
+    }
+  }, [rooms, user]);
+
+  useEffect(() => {
+    if (!user || rooms.length === 0) return undefined;
+    fetchAdminJoinRequests();
+    const t = setInterval(fetchAdminJoinRequests, 15000);
+    return () => clearInterval(t);
+  }, [user, rooms, fetchAdminJoinRequests]);
+
+  const totalAdminPending = adminPendingBundles.reduce(
+    (n, b) => n + b.pending.length,
+    0
+  );
 
   const filtered = rooms
     .filter((r) => r.name.toLowerCase().includes(search.toLowerCase()))
@@ -79,22 +167,40 @@ export default function Sidebar({ onEnterRoom }) {
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
-        <div className="user-info">
-          <span className="user-name">{user.name}</span>
+        <div className="sidebar-header-row">
+          <div className="user-info">
+            <span className="user-name">{user.name}</span>
+          </div>
+          <div className="sidebar-header-actions">
+            {totalAdminPending > 0 && (
+              <button
+                type="button"
+                className="admin-requests-btn"
+                onClick={() => setShowAdminJoinModal(true)}
+                title="Join requests to approve"
+              >
+                Requests
+                <span className="admin-requests-badge">{totalAdminPending}</span>
+              </button>
+            )}
+            <button
+              type="button"
+              className="create-room-btn"
+              onClick={() => setShowCreate(true)}
+              title="Create room"
+            >
+              +
+            </button>
+          </div>
         </div>
-        <div className="sidebar-header-actions">
-          <button
-            type="button"
-            className="logout-btn"
-            onClick={handleLogout}
-            title="Sign out and log in as someone else"
-          >
-            Log out
-          </button>
-          <button className="create-room-btn" onClick={() => setShowCreate(true)} title="Create room">
-            +
-          </button>
-        </div>
+        <button
+          type="button"
+          className="logout-btn sidebar-logout-wide"
+          onClick={handleLogout}
+          title="Sign out and log in as someone else"
+        >
+          Log out
+        </button>
       </div>
 
       <div className="search-bar">
@@ -114,7 +220,19 @@ export default function Sidebar({ onEnterRoom }) {
             onClick={() => handleRoomClick(room)}
           >
             <span className="room-name">{room.name}</span>
-            <span className="room-meta">{badgeFor(room.membership)}</span>
+            <span className="room-meta">
+              {room.membership?.role === "admin" &&
+                room.membership?.status === "approved" &&
+                (roomPendingCount[room.id] || 0) > 0 && (
+                  <span
+                    className="room-pending-pill"
+                    title="Pending join requests"
+                  >
+                    {roomPendingCount[room.id]}
+                  </span>
+                )}
+              {badgeFor(room.membership)}
+            </span>
           </li>
         ))}
         {filtered.length === 0 && (
@@ -127,7 +245,18 @@ export default function Sidebar({ onEnterRoom }) {
           room={joinTarget}
           onClose={() => setJoinTarget(null)}
           onJoined={() => {
-            setJoinTarget(null);
+            loadRooms();
+          }}
+        />
+      )}
+
+      {showAdminJoinModal && adminPendingBundles.length > 0 && (
+        <AdminJoinRequestsModal
+          bundles={adminPendingBundles}
+          user={user}
+          onClose={() => setShowAdminJoinModal(false)}
+          onChanged={() => {
+            fetchAdminJoinRequests();
             loadRooms();
           }}
         />
