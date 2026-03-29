@@ -96,6 +96,24 @@ export default function ChatArea() {
   }
 
   const canWrite = activeRoom.role === "write" || activeRoom.role === "admin";
+  const isAdmin = activeRoom.role === "admin";
+
+  const handleDeleteMessage = useCallback(
+    async (messageId) => {
+      if (!isAdmin || !user) return;
+      if (!window.confirm("Delete this message for everyone in the room?")) return;
+      try {
+        await api(
+          `/rooms/${activeRoom.id}/messages/${messageId}?admin_id=${user.id}`,
+          { method: "DELETE" }
+        );
+        dispatch({ type: "REMOVE_MESSAGE", payload: messageId });
+      } catch (err) {
+        alert(err.message);
+      }
+    },
+    [activeRoom?.id, isAdmin, user, dispatch]
+  );
   const typingNames = Object.keys(typingUsers);
   const typingLabel =
     typingNames.length === 1
@@ -132,7 +150,13 @@ export default function ChatArea() {
         {/* Messages */}
         <div className="messages-container">
           {messages.map((msg, i) => (
-            <Message key={msg.id || `sys-${i}`} msg={msg} userId={user.id} />
+            <Message
+              key={msg.id || `sys-${i}`}
+              msg={msg}
+              userId={user.id}
+              isAdmin={isAdmin}
+              onDelete={handleDeleteMessage}
+            />
           ))}
           <div ref={messagesEndRef} />
         </div>
@@ -178,7 +202,7 @@ export default function ChatArea() {
 }
 
 /* ── Single message bubble ── */
-function Message({ msg, userId }) {
+function Message({ msg, userId, isAdmin, onDelete }) {
   if (msg.type === "system") {
     return <div className="msg-system">{msg.content}</div>;
   }
@@ -193,26 +217,41 @@ function Message({ msg, userId }) {
 
   return (
     <div className={`msg ${isMe ? "msg-out" : "msg-in"}`}>
-      {!isMe && (
-        <div className="sender">
-          {msg.sender_name || `User ${msg.sender_id}`}
+      <div className="msg-body-row">
+        <div className="msg-main">
+          {!isMe && (
+            <div className="sender">
+              {msg.sender_name || `User ${msg.sender_id}`}
+            </div>
+          )}
+          {msg.type === "file" ? (
+            <div className="text">
+              <a
+                className="file-link"
+                href={`${API_BASE}${msg.content}?user_id=${userId}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {msg.filename || "Attachment"}
+              </a>
+            </div>
+          ) : (
+            <div className="text">{msg.content}</div>
+          )}
+          <div className="meta">{time}</div>
         </div>
-      )}
-      {msg.type === "file" ? (
-        <div className="text">
-          <a
-            className="file-link"
-            href={`${API_BASE}${msg.content}?user_id=${userId}`}
-            target="_blank"
-            rel="noreferrer"
+        {isAdmin && msg.id != null && (
+          <button
+            type="button"
+            className="msg-delete-btn"
+            title="Delete message"
+            aria-label="Delete message"
+            onClick={() => onDelete(msg.id)}
           >
-            {msg.filename || "Attachment"}
-          </a>
-        </div>
-      ) : (
-        <div className="text">{msg.content}</div>
-      )}
-      <div className="meta">{time}</div>
+            ×
+          </button>
+        )}
+      </div>
     </div>
   );
 }

@@ -4,7 +4,7 @@ services:
     runtime: python
     # Repo root is the service root so ../frontend/dist is available for the SPA.
     buildCommand: pip install -r backend/requirements.txt
-    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT --no-access-log
     envVars:
       - key: DATABASE_URL
         sync: false  # Set manually in Render dashboard

@@ -35,8 +35,13 @@ async function fetchWithTimeout(url, opts = {}) {
 }
 
 export async function api(path, opts = {}) {
+  const method = (opts.method || "GET").toUpperCase();
+  const headers = { ...opts.headers };
+  if (method !== "DELETE" && headers["Content-Type"] === undefined) {
+    headers["Content-Type"] = "application/json";
+  }
   const res = await fetchWithTimeout(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...opts.headers },
+    headers,
     ...opts,
   });
   if (!res.ok) {

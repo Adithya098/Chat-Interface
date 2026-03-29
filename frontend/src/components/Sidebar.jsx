@@ -43,6 +43,12 @@ export default function Sidebar({ onEnterRoom }) {
     loadRooms();
   }, [loadRooms]);
 
+  useEffect(() => {
+    const onRoomsRefresh = () => loadRooms();
+    window.addEventListener("chat-refresh-rooms", onRoomsRefresh);
+    return () => window.removeEventListener("chat-refresh-rooms", onRoomsRefresh);
+  }, [loadRooms]);
+
   // Pick up admin approvals without a full reload (DB was already updated).
   useEffect(() => {
     if (!user) return undefined;

@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.database import get_db
+from app.connection_manager import manager
 from app.models.document import Document
 from app.models.message import Message
 from app.models.room import Room
+from app.models.room_member import RoomMember
 from app.models.user import User
 from app.schemas.message import MessageResponse
 
@@ -67,3 +69,35 @@ def get_messages(
             )
         )
     return out
+
+
+@router.delete("/{message_id}")
+async def delete_message(
+    room_id: int,
+    message_id: int,
+    admin_id: int = Query(...),
+    db: Session = Depends(get_db),
+):
+    # Verify admin
+    admin = db.query(RoomMember).filter(
+        RoomMember.room_id == room_id,
+        RoomMember.user_id == admin_id,
+        RoomMember.role == "admin",
+        RoomMember.status == "approved",
+    ).first()
+    if not admin:
+        raise HTTPException(status_code=403, detail="Only admins can delete messages")
+
+    msg = db.query(Message).filter(
+        Message.id == message_id,
+        Message.room_id == room_id,
+    ).first()
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    db.delete(msg)
+    db.commit()
+
+    await manager.broadcast(room_id, {"type": "message_deleted", "message_id": message_id})
+
+    return {"detail": "Message deleted", "message_id": message_id}

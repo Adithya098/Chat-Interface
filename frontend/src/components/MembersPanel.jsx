@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useChat } from "../context/ChatContext";
 import { api } from "../hooks/useApi";
 import "../styles/Members.css";
@@ -11,6 +11,8 @@ export default function MembersPanel({ onClose }) {
   const [names, setNames] = useState({});
 
   const isAdmin = activeRoom?.role === "admin";
+
+  const loadMembersRef = useRef(async () => {});
 
   const loadMembers = async () => {
     if (!activeRoom) return;
@@ -45,9 +47,31 @@ export default function MembersPanel({ onClose }) {
     }
   };
 
+  loadMembersRef.current = loadMembers;
+
   useEffect(() => {
     loadMembers();
   }, [activeRoom?.id, activeRoom?.role]);
+
+  useEffect(() => {
+    const onMembersRefresh = () => loadMembersRef.current();
+    window.addEventListener("chat-refresh-members", onMembersRefresh);
+    return () => window.removeEventListener("chat-refresh-members", onMembersRefresh);
+  }, []);
+
+  const handleRemoveMember = async (targetUserId) => {
+    if (!activeRoom || !user) return;
+    if (!window.confirm("Remove this member from the room?")) return;
+    try {
+      await api(
+        `/rooms/${activeRoom.id}/members/${targetUserId}?admin_id=${user.id}`,
+        { method: "DELETE" }
+      );
+      loadMembers();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
 
   const handleAction = async (userId, action) => {
     try {
@@ -69,12 +93,30 @@ export default function MembersPanel({ onClose }) {
       </div>
 
       <div className="members-list">
-        {members.map((m) => (
-          <div key={m.id} className="member-row">
-            <span className="name">{names[m.user_id] || `User ${m.user_id}`}</span>
-            <span className={`badge badge-${m.role}`}>{m.role}</span>
-          </div>
-        ))}
+        {members.map((m) => {
+          const canRemove =
+            isAdmin &&
+            Number(m.user_id) !== Number(user?.id) &&
+            m.role !== "admin";
+          return (
+            <div key={m.id} className="member-row">
+              <span className="name">{names[m.user_id] || `User ${m.user_id}`}</span>
+              <span className="member-row-actions">
+                <span className={`badge badge-${m.role}`}>{m.role}</span>
+                {canRemove && (
+                  <button
+                    type="button"
+                    className="btn-remove"
+                    title="Remove from room"
+                    onClick={() => handleRemoveMember(m.user_id)}
+                  >
+                    Remove
+                  </button>
+                )}
+              </span>
+            </div>
+          );
+        })}
       </div>
 
       {isAdmin && pending.length > 0 && (

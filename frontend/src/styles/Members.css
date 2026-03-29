@@ -29,8 +29,27 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 16px;
+  gap: 8px;
 }
-.member-row .name { font-size: 0.88rem; }
+.member-row .name { font-size: 0.88rem; flex: 1; min-width: 0; }
+.member-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.btn-remove {
+  font-size: 0.72rem;
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--danger, #c44);
+  border: 1px solid var(--danger, #c44);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.btn-remove:hover {
+  background: rgba(204, 68, 68, 0.15);
+}
 
 .pending-section h4 {
   padding: 10px 16px 4px;

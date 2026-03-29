@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.database import get_db
+from app.connection_manager import manager
 from app.models.user import User
 from app.models.room import Room
 from app.models.room_member import RoomMember
@@ -97,6 +98,38 @@ def reject_member(room_id: int, req: ApproveRejectRequest, db: Session = Depends
     db.commit()
     db.refresh(member)
     return member
+
+
+@router.delete("/members/{user_id}")
+async def remove_member(
+    room_id: int,
+    user_id: int,
+    admin_id: int = Query(...),
+    db: Session = Depends(get_db),
+):
+    _get_room_or_404(room_id, db)
+    _get_admin_or_403(room_id, admin_id, db)
+
+    if admin_id == user_id:
+        raise HTTPException(status_code=400, detail="Admins cannot remove themselves")
+
+    member = db.query(RoomMember).filter(
+        RoomMember.room_id == room_id,
+        RoomMember.user_id == user_id,
+    ).first()
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+
+    if member.role == "admin":
+        raise HTTPException(status_code=400, detail="Cannot remove another admin")
+
+    db.delete(member)
+    db.commit()
+
+    await manager.kick_user(room_id, user_id)
+    await manager.broadcast(room_id, {"type": "member_removed", "user_id": user_id})
+
+    return {"detail": "Member removed"}
 
 
 @router.get("/members", response_model=list[RoomMemberResponse])

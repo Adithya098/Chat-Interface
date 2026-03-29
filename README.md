@@ -51,7 +51,7 @@ npm run dev
 **Backend only** (serves built `frontend/dist` if present):
 
 ```bash
-cd backend && python -m uvicorn app.main:app --reload
+cd backend && python -m uvicorn app.main:app --reload --no-access-log
 ```
 
 ## API Overview

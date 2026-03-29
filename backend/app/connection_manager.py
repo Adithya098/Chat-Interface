@@ -26,6 +26,17 @@ class ConnectionManager:
             if not self.rooms[room_id]:
                 del self.rooms[room_id]
 
+    async def kick_user(self, room_id: int, user_id: int, reason: str = "You have been removed from this room"):
+        """Notify user, close their socket, and drop them from the room map."""
+        ws = self.rooms.get(room_id, {}).get(user_id)
+        if ws:
+            try:
+                await ws.send_json({"type": "kicked", "content": reason})
+                await ws.close(code=4000)
+            except Exception:
+                pass
+            self.disconnect(room_id, user_id)
+
     async def broadcast(self, room_id: int, message: dict, exclude_user: int | None = None):
         """Send a message to all connected users in a room."""
         connections = self.rooms.get(room_id, {})

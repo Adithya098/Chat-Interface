@@ -3,9 +3,10 @@ import { useChat } from "../context/ChatContext";
 import { wsUrl } from "../config.js";
 
 export function useWebSocket() {
-  const { state, dispatch } = useChat();
+  const { dispatch } = useChat();
   const wsRef = useRef(null);
   const reconnectTimer = useRef(null);
+  const skipReconnectRef = useRef(false);
 
   const connect = useCallback((roomId, userId) => {
     // Clean up previous
@@ -14,6 +15,7 @@ export function useWebSocket() {
       wsRef.current = null;
     }
     clearTimeout(reconnectTimer.current);
+    skipReconnectRef.current = false;
 
     const url = wsUrl(`/ws/${roomId}?user_id=${userId}`);
 
@@ -82,10 +84,29 @@ export function useWebSocket() {
             payload: { type: "system", content: `Error: ${data.content}` },
           });
           break;
+
+        case "message_deleted":
+          if (data.message_id != null) {
+            dispatch({ type: "REMOVE_MESSAGE", payload: data.message_id });
+          }
+          break;
+
+        case "member_removed":
+          window.dispatchEvent(new CustomEvent("chat-refresh-members"));
+          break;
+
+        case "kicked":
+          skipReconnectRef.current = true;
+          alert(data.content || "You were removed from this room");
+          dispatch({ type: "SET_ACTIVE_ROOM", payload: null });
+          dispatch({ type: "SET_MESSAGES", payload: [] });
+          window.dispatchEvent(new CustomEvent("chat-refresh-rooms"));
+          break;
       }
     };
 
     socket.onclose = () => {
+      if (skipReconnectRef.current) return;
       // Auto-reconnect after 3s
       reconnectTimer.current = setTimeout(() => {
         if (wsRef.current === socket) {

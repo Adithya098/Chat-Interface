@@ -33,6 +33,14 @@ function reducer(state, action) {
     case "ADD_MESSAGE":
       return { ...state, messages: [...state.messages, action.payload] };
 
+    case "REMOVE_MESSAGE":
+      return {
+        ...state,
+        messages: state.messages.filter(
+          (m) => m.id == null || Number(m.id) !== Number(action.payload)
+        ),
+      };
+
     case "SET_ONLINE_USERS":
       return { ...state, onlineUsers: action.payload };
 
