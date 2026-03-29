@@ -1,0 +1,66 @@
+:root {
+  --bg-dark:       #111b21;
+  --bg-panel:      #1f2c34;
+  --bg-chat:       #0b141a;
+  --bg-input:      #2a3942;
+  --accent:        #00a884;
+  --accent-hover:  #02906f;
+  --text:          #e9edef;
+  --text-muted:    #8696a0;
+  --bubble-out:    #005c4b;
+  --bubble-in:     #202c33;
+  --border:        #2a3942;
+  --danger:        #ea4335;
+  --radius:        8px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; }
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg-dark);
+  color: var(--text);
+}
+
+input, button { font-family: inherit; font-size: 0.9rem; }
+input {
+  background: var(--bg-input);
+  color: var(--text);
+  border: none;
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  outline: none;
+}
+input:focus { box-shadow: 0 0 0 2px var(--accent); }
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: var(--radius);
+  padding: 8px 16px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+button:hover { background: var(--accent-hover); }
+button:disabled { opacity: 0.5; cursor: default; }
+
+.error { color: var(--danger); font-size: 0.8rem; margin-top: 6px; }
+
+.badge {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+.badge-admin   { background: #f59e0b; color: #000; }
+.badge-write   { background: var(--accent); color: #fff; }
+.badge-read    { background: var(--text-muted); color: #000; }
+.badge-pending { background: #6b7280; color: #fff; }
+.badge-rejected { background: var(--danger); color: #fff; }
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }

@@ -1,0 +1,39 @@
+import { useCallback } from "react";
+import { ChatProvider, useChat } from "./context/ChatContext";
+import LoginScreen from "./components/LoginScreen";
+import Sidebar from "./components/Sidebar";
+import ChatArea from "./components/ChatArea";
+import "./App.css";
+
+function AppInner() {
+  const { state, dispatch } = useChat();
+
+  const handleEnterRoom = useCallback(
+    (room, role) => {
+      dispatch({
+        type: "SET_ACTIVE_ROOM",
+        payload: { id: room.id, name: room.name, role },
+      });
+    },
+    [dispatch]
+  );
+
+  if (!state.user) {
+    return <LoginScreen />;
+  }
+
+  return (
+    <div className="app-layout">
+      <Sidebar onEnterRoom={handleEnterRoom} />
+      <ChatArea />
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ChatProvider>
+      <AppInner />
+    </ChatProvider>
+  );
+}

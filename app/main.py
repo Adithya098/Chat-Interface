@@ -1,10 +1,16 @@
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from app.database import engine, Base
 import app.models  # noqa: F401 — register all models (including Document) for metadata.create_all
 from app.routers import users, rooms, members, ws, messages, files
+
+# In production, serve the React build output; in dev, use Vite dev server with proxy
+FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 
 
 @asynccontextmanager
@@ -34,6 +40,14 @@ app.include_router(messages.router)
 app.include_router(files.router)
 
 
-@app.get("/")
-def root():
-    return {"message": "Chat Backend API is running"}
+# Serve React build in production (after `npm run build`)
+if FRONTEND_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="assets")
+
+    @app.get("/")
+    def serve_spa():
+        return FileResponse(str(FRONTEND_DIST / "index.html"))
+else:
+    @app.get("/")
+    def root():
+        return {"message": "Chat Backend API is running. Start React dev server on port 3000."}

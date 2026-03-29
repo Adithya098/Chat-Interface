@@ -1,0 +1,66 @@
+.sidebar {
+  width: 340px;
+  min-width: 340px;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.user-info { display: flex; align-items: center; gap: 8px; }
+.user-name { font-weight: 600; }
+
+.create-room-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 1.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.search-bar { padding: 8px 12px; }
+.search-bar input { width: 100%; }
+
+.room-list {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.room-list li {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background 0.1s;
+}
+
+.room-list li:hover { background: var(--bg-input); }
+.room-list li.active { background: var(--bg-input); }
+.room-list li.empty-rooms {
+  cursor: default;
+  color: var(--text-muted);
+  justify-content: center;
+}
+.room-list li.empty-rooms:hover { background: transparent; }
+
+.room-name { font-weight: 500; }
+.room-meta { display: flex; align-items: center; gap: 6px; }
+
+@media (max-width: 768px) {
+  .sidebar { width: 100%; min-width: unset; }
+}

@@ -1,0 +1,17 @@
+.app-layout {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .app-layout .chat-area {
+    display: none;
+  }
+  .app-layout.chat-open .sidebar {
+    display: none;
+  }
+  .app-layout.chat-open .chat-area {
+    display: flex;
+  }
+}
