@@ -1,8 +1,16 @@
+/*
+ * Shared React context and reducer for application-wide chat state.
+ *
+ * This file centralizes user session persistence, room selection, message
+ * timeline updates, typing indicators, reply state, and online-user presence
+ * so all chat UI components can read and dispatch consistent state changes.
+ */
 import { createContext, useContext, useReducer } from "react";
 
 const ChatContext = createContext(null);
 
 function loadStoredUser() {
+  /* Restores the last signed-in user from localStorage when available. */
   try {
     const raw = localStorage.getItem("chat_user");
     if (raw == null || raw === "") return null;
@@ -14,6 +22,7 @@ function loadStoredUser() {
 }
 
 function getInitialState() {
+  /* Creates the default state object used to initialize the chat reducer. */
   return {
     user: loadStoredUser(),
     rooms: [],
@@ -26,6 +35,7 @@ function getInitialState() {
 }
 
 function reducer(state, action) {
+  /* Applies chat state transitions for auth, room, message, and typing actions. */
   switch (action.type) {
     case "SET_USER":
       localStorage.setItem("chat_user", JSON.stringify(action.payload));
@@ -80,6 +90,7 @@ function reducer(state, action) {
 }
 
 export function ChatProvider({ children }) {
+  /* Provides reducer-driven chat state and dispatch to descendant components. */
   const [state, dispatch] = useReducer(reducer, undefined, getInitialState);
   return (
     <ChatContext.Provider value={{ state, dispatch }}>
@@ -89,6 +100,7 @@ export function ChatProvider({ children }) {
 }
 
 export function useChat() {
+  /* Returns chat context and guards against usage outside the provider tree. */
   const ctx = useContext(ChatContext);
   if (!ctx) throw new Error("useChat must be inside ChatProvider");
   return ctx;

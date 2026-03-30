@@ -1,3 +1,10 @@
+/*
+  Left sidebar styling for room navigation and admin request indicators.
+
+  This file defines sidebar structure, user/header controls, searchable room
+  list rows, membership badges, pending request pills, and mobile layout rules.
+*/
+
 .sidebar {
   width: 340px;
   min-width: 340px;
@@ -8,6 +15,7 @@
   height: 100%;
 }
 
+/* Header and user controls */
 .sidebar-header {
   display: flex;
   flex-direction: column;
@@ -31,6 +39,7 @@
   flex-shrink: 0;
 }
 
+/* Admin request indicators */
 .admin-requests-btn {
   position: relative;
   display: inline-flex;
@@ -79,6 +88,7 @@
   border-radius: 999px;
 }
 
+/* Identity and session controls */
 .user-info { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .user-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -110,6 +120,7 @@
   padding: 0;
 }
 
+/* Search and room list */
 .search-bar { padding: 8px 12px; }
 .search-bar input { width: 100%; }
 
@@ -141,6 +152,7 @@
 .room-name { font-weight: 500; }
 .room-meta { display: flex; align-items: center; gap: 6px; }
 
+/* Mobile sizing */
 @media (max-width: 768px) {
   .sidebar { width: 100%; min-width: unset; }
 }

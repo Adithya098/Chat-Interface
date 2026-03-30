@@ -1,15 +1,24 @@
+/*
+ * Modal dialog for requesting access to a room with a selected role.
+ *
+ * This component sends membership requests for read/write/admin roles, shows a
+ * confirmation state after submission, and communicates completion back to the
+ * parent so room membership status can be refreshed.
+ */
 import { useState } from "react";
 import { useChat } from "../context/ChatContext";
 import { api } from "../hooks/useApi";
 import "../styles/Modal.css";
 
 export default function JoinModal({ room, onClose, onJoined }) {
+  /* Renders role request options and tracks join-request submission state. */
   const { state } = useChat();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
   const handleJoin = async (role) => {
+    /* Submits a join request for the selected role and updates local UI state. */
     setError("");
     setLoading(true);
     try {
@@ -27,6 +36,7 @@ export default function JoinModal({ room, onClose, onJoined }) {
   };
 
   const handleClose = () => {
+    /* Closes the modal and returns control to the parent component. */
     onClose();
   };
 

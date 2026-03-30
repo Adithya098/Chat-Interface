@@ -1,3 +1,10 @@
+/*
+  Confirmation dialog overlay and action button styling.
+
+  This file styles the full-screen backdrop, modal container, message text,
+  primary/secondary action buttons, and open animation for global confirms.
+*/
+
 .confirm-overlay {
   position: fixed;
   inset: 0;
@@ -8,6 +15,7 @@
   z-index: 1000;
 }
 
+/* Dialog container */
 .confirm-dialog {
   background: var(--bg-panel);
   border: 1px solid var(--border);
@@ -22,6 +30,7 @@
   animation: confirm-pop 0.18s ease;
 }
 
+/* Message and action area */
 .confirm-message {
   font-size: 0.95rem;
   color: var(--text);
@@ -35,6 +44,7 @@
   gap: 10px;
 }
 
+/* Secondary and primary buttons */
 .confirm-cancel {
   background: transparent;
   color: var(--text-muted);
@@ -64,6 +74,7 @@
   opacity: 0.85;
 }
 
+/* Open animation */
 @keyframes confirm-pop {
   from { opacity: 0; transform: scale(0.95); }
   to   { opacity: 1; transform: scale(1); }

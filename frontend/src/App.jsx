@@ -1,3 +1,10 @@
+/*
+ * Root application layout and provider wiring for the chat frontend.
+ *
+ * This file composes the authenticated app shell, routes user interactions
+ * between sidebar and chat area, and wraps everything in the shared chat state
+ * provider so components can coordinate room, message, and user state.
+ */
 import { useCallback } from "react";
 import { ChatProvider, useChat } from "./context/ChatContext";
 import LoginScreen from "./components/LoginScreen";
@@ -8,6 +15,7 @@ import ConfirmDialog from "./components/ConfirmDialog";
 import "./App.css";
 
 function AppInner() {
+  /* Selects a room and records the current user's role for chat permissions. */
   const { state, dispatch } = useChat();
 
   const handleEnterRoom = useCallback(
@@ -38,6 +46,7 @@ function AppInner() {
 }
 
 export default function App() {
+  /* Provides global chat context and renders the main app content tree. */
   return (
     <ChatProvider>
       <AppInner />

@@ -1,3 +1,10 @@
+/*
+ * Room navigation sidebar with search, membership status, and admin request cues.
+ *
+ * This component loads room membership context for the current user, refreshes
+ * data on focus/interval/events, surfaces pending admin join requests, and
+ * launches room-related modals for joining, creating, and moderation.
+ */
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useChat } from "../context/ChatContext";
 import { api } from "../hooks/useApi";
@@ -8,6 +15,7 @@ import AdminJoinRequestsModal from "./AdminJoinRequestsModal";
 import "../styles/Sidebar.css";
 
 export default function Sidebar({ onEnterRoom }) {
+  /* Renders room list UI and coordinates room selection and room-level actions. */
   const { state, dispatch } = useChat();
   const { user, rooms, activeRoom } = state;
   const [search, setSearch] = useState("");
@@ -19,6 +27,7 @@ export default function Sidebar({ onEnterRoom }) {
   const autoShownPendingIdsRef = useRef(new Set());
 
   const loadRooms = useCallback(async () => {
+    /* Loads all rooms and enriches each with this user's membership details. */
     if (!user) return;
     const myId = Number(user.id);
     try {
@@ -80,6 +89,7 @@ export default function Sidebar({ onEnterRoom }) {
   }, [user, hasPendingMembership, loadRooms]);
 
   const fetchAdminJoinRequests = useCallback(async () => {
+    /* Fetches pending join requests for rooms where current user is admin. */
     if (!user) return;
     const adminRooms = rooms.filter(
       (r) =>
@@ -144,6 +154,7 @@ export default function Sidebar({ onEnterRoom }) {
     });
 
   const handleRoomClick = (room) => {
+    /* Opens approved rooms or routes non-approved states to feedback/actions. */
     const m = room.membership;
     if (m && m.status === "approved") {
       onEnterRoom(room, m.role);
@@ -157,6 +168,7 @@ export default function Sidebar({ onEnterRoom }) {
   };
 
   const badgeFor = (m) => {
+    /* Returns a membership status badge node for room list display. */
     if (!m) return null;
     if (m.status === "approved")
       return <span className={`badge badge-${m.role}`}>{m.role}</span>;
@@ -168,6 +180,7 @@ export default function Sidebar({ onEnterRoom }) {
   };
 
   const handleLogout = () => {
+    /* Clears user session state and returns app to login screen. */
     dispatch({ type: "LOGOUT" });
   };
 

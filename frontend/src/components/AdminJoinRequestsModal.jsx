@@ -1,3 +1,10 @@
+/*
+ * Admin moderation modal for pending room join requests across managed rooms.
+ *
+ * This component groups pending requests by room, resolves display names for
+ * requesting users, and lets admins approve or reject each request while
+ * notifying the parent to refresh membership state.
+ */
 import { useState, useEffect } from "react";
 import { api } from "../hooks/useApi";
 import { showToast } from "../utils/toast";
@@ -5,6 +12,7 @@ import "../styles/Modal.css";
 import "../styles/AdminJoinRequestsModal.css";
 
 export default function AdminJoinRequestsModal({ bundles, user, onClose, onChanged }) {
+  /* Renders grouped pending join requests and moderation controls for admins. */
   const [names, setNames] = useState({});
 
   useEffect(() => {
@@ -32,6 +40,7 @@ export default function AdminJoinRequestsModal({ bundles, user, onClose, onChang
   }, [bundles]);
 
   const handleAction = async (roomId, targetUserId, action) => {
+    /* Sends approve/reject action for a target user in a specific room. */
     try {
       await api(`/rooms/${roomId}/${action}`, {
         method: "POST",

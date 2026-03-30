@@ -1,3 +1,10 @@
+/*
+ * Room members side panel with admin moderation and role-management controls.
+ *
+ * This component loads approved and pending members, resolves user names,
+ * supports admin actions (approve/reject/promote/remove), and refreshes its
+ * content in response to room changes and global member refresh events.
+ */
 import { useState, useEffect, useRef } from "react";
 import { useChat } from "../context/ChatContext";
 import { api } from "../hooks/useApi";
@@ -6,6 +13,7 @@ import { showConfirm } from "../utils/confirm";
 import "../styles/Members.css";
 
 export default function MembersPanel({ onClose }) {
+  /* Renders member lists and action buttons for the active room. */
   const { state } = useChat();
   const { activeRoom, user } = state;
   const [members, setMembers] = useState([]);
@@ -17,6 +25,7 @@ export default function MembersPanel({ onClose }) {
   const loadMembersRef = useRef(async () => {});
 
   const loadMembers = async () => {
+    /* Fetches current room memberships and optional admin pending requests. */
     if (!activeRoom) return;
     const admin = activeRoom.role === "admin";
     try {
@@ -62,6 +71,7 @@ export default function MembersPanel({ onClose }) {
   }, []);
 
   const handleRemoveMember = async (targetUserId) => {
+    /* Removes a member from the active room after confirmation. */
     if (!activeRoom || !user) return;
     if (!await showConfirm("Remove this member from the room?")) return;
     try {
@@ -76,6 +86,7 @@ export default function MembersPanel({ onClose }) {
   };
 
   const handlePromoteMember = async (targetUserId) => {
+    /* Promotes a non-admin member to admin after confirmation. */
     if (!activeRoom || !user) return;
     if (!await showConfirm("Promote this member to admin?")) return;
     try {
@@ -90,6 +101,7 @@ export default function MembersPanel({ onClose }) {
   };
 
   const handleAction = async (userId, action) => {
+    /* Applies admin approve/reject action for a pending join request. */
     try {
       await api(`/rooms/${activeRoom.id}/${action}`, {
         method: "POST",

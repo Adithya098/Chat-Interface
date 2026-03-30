@@ -1,3 +1,11 @@
+/*
+  Main chat workspace styling for header, timeline, compose, and reply UI.
+
+  This file controls chat layout, typing indicators, message bubble variants,
+  inline message actions, reply quote/banner elements, file link visuals, and
+  responsive behavior for smaller screens.
+*/
+
 .chat-area {
   flex: 1;
   display: flex;

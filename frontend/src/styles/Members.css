@@ -1,3 +1,10 @@
+/*
+  Members panel styling for room roster and moderation controls.
+
+  This stylesheet formats the side panel shell, member rows, role badges,
+  promote/remove controls, pending request rows, and compact mobile overlay.
+*/
+
 .members-panel {
   width: 300px;
   min-width: 300px;
@@ -8,6 +15,7 @@
   overflow-y: auto;
 }
 
+/* Panel header and close action */
 .panel-header {
   display: flex;
   align-items: center;
@@ -22,6 +30,7 @@
   padding: 0;
 }
 
+/* Approved member list rows */
 .members-list { padding: 8px 0; }
 
 .member-row {
@@ -38,6 +47,8 @@
   gap: 8px;
   flex-shrink: 0;
 }
+
+/* Admin role actions */
 .btn-promote {
   font-size: 0.72rem;
   padding: 4px 8px;
@@ -64,6 +75,7 @@
   background: rgba(204, 68, 68, 0.15);
 }
 
+/* Pending request moderation */
 .pending-section h4 {
   padding: 10px 16px 4px;
   color: var(--text-muted);
@@ -83,6 +95,7 @@
 .btn-approve { background: var(--accent); }
 .btn-reject  { background: var(--danger); }
 
+/* Mobile overlay panel behavior */
 @media (max-width: 768px) {
   .members-panel {
     position: absolute;

@@ -1,9 +1,17 @@
+/*
+ * Authentication screen that handles login and account creation workflows.
+ *
+ * This component toggles between login and signup forms, validates required
+ * fields, calls backend auth endpoints, surfaces errors, and stores the
+ * authenticated user in global chat context on success.
+ */
 import { useState } from "react";
 import { useChat } from "../context/ChatContext";
 import { api } from "../hooks/useApi";
 import "../styles/Login.css";
 
 export default function LoginScreen() {
+  /* Renders login/signup forms and coordinates authentication actions. */
   const { dispatch } = useChat();
   const [mode, setMode] = useState("login"); // "login" | "signup"
 
@@ -18,11 +26,13 @@ export default function LoginScreen() {
   const [mobile, setMobile] = useState("");
 
   const switchMode = () => {
+    /* Toggles between login and signup mode while clearing stale errors. */
     setMode(mode === "login" ? "signup" : "login");
     setError("");
   };
 
   const handleLogin = async (e) => {
+    /* Submits login credentials and stores the returned user on success. */
     e.preventDefault();
     setError("");
     if (!email.trim() || !password) {
@@ -45,6 +55,7 @@ export default function LoginScreen() {
   };
 
   const handleSignup = async (e) => {
+    /* Submits account registration data and signs in the new user. */
     e.preventDefault();
     setError("");
     if (!name.trim() || !email.trim() || !password || !mobile.trim()) {

@@ -1,15 +1,25 @@
+/*
+ * Global toast banner for kick events and general in-app notifications.
+ *
+ * This component subscribes to global custom events, queues transient toast
+ * messages, auto-dismisses them after a timeout, and allows manual dismissal
+ * from the UI.
+ */
 import { useState, useEffect } from "react";
 
 export default function KickedBanner() {
+  /* Renders and manages the lifecycle of top-level toast notifications. */
   const [toasts, setToasts] = useState([]);
 
   const addToast = (message, type = "error") => {
+    /* Adds a toast entry and schedules automatic removal. */
     const id = Date.now();
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => removeToast(id), 5000);
   };
 
   const removeToast = (id) => {
+    /* Removes a specific toast from the visible queue. */
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 

@@ -1,3 +1,11 @@
+/*
+  Authentication screen styling for login and signup flows.
+
+  This file defines centered auth layout, card sizing/spacing, subtitle and
+  link-button presentation, and input sizing rules specific to login/signup
+  forms.
+*/
+
 .login-screen {
   height: 100%;
   display: flex;
@@ -5,6 +13,7 @@
   align-items: center;
 }
 
+/* Auth card shell */
 .login-card {
   background: var(--bg-panel);
   padding: 40px;
@@ -27,11 +36,13 @@
   font-size: 0.85rem;
 }
 
+/* Form field sizing */
 .login-card input[type="password"],
 .login-card input[type="tel"] {
   width: 100%;
 }
 
+/* Mode switch link row */
 .switch-mode {
   text-align: center;
   font-size: 0.82rem;
@@ -39,6 +50,7 @@
   margin-top: 4px;
 }
 
+/* Inline link-style button */
 .link-btn {
   background: none;
   border: none;

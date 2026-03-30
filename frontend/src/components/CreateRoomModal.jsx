@@ -1,15 +1,24 @@
+/*
+ * Modal dialog for creating a new chat room.
+ *
+ * This component collects a room name, validates basic input, submits a room
+ * creation request using the current user as creator, and notifies the parent
+ * when creation succeeds so room lists can refresh.
+ */
 import { useState } from "react";
 import { useChat } from "../context/ChatContext";
 import { api } from "../hooks/useApi";
 import "../styles/Modal.css";
 
 export default function CreateRoomModal({ onClose, onCreated }) {
+  /* Renders room creation form and drives submit/cancel modal behavior. */
   const { state } = useChat();
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleCreate = async (e) => {
+    /* Validates and sends room creation request, then signals success upstream. */
     e.preventDefault();
     if (!name.trim()) {
       setError("Room name is required");

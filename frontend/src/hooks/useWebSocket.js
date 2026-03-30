@@ -1,8 +1,16 @@
+/*
+ * Realtime websocket hook for room-level chat events and connection lifecycle.
+ *
+ * This hook opens room sockets, handles reconnect behavior, translates inbound
+ * websocket events into chat reducer actions, emits typing diagnostics, and
+ * exposes connect/disconnect/send helpers for chat UI components.
+ */
 import { useEffect, useRef, useCallback } from "react";
 import { useChat } from "../context/ChatContext";
 import { wsUrl } from "../config.js";
 
 export function useWebSocket() {
+  /* Creates websocket controls and wires inbound events to global chat state. */
   const { dispatch } = useChat();
   const wsRef = useRef(null);
   const reconnectTimer = useRef(null);
@@ -10,6 +18,7 @@ export function useWebSocket() {
   const typingTimers = useRef({});
 
   const connect = useCallback((roomId, userId) => {
+    /* Opens a websocket for the room/user and installs message handlers. */
     // Clean up previous
     if (wsRef.current) {
       wsRef.current.close();
@@ -142,6 +151,7 @@ export function useWebSocket() {
   }, [dispatch]);
 
   const disconnect = useCallback(() => {
+    /* Closes active websocket and cancels pending reconnect attempts. */
     clearTimeout(reconnectTimer.current);
     if (wsRef.current) {
       wsRef.current.close();
@@ -150,6 +160,7 @@ export function useWebSocket() {
   }, []);
 
   const send = useCallback((data) => {
+    /* Sends websocket payloads when the socket is open, with debug telemetry. */
     if (data?.type === "typing" || data?.type === "stop_typing") {
       window.dispatchEvent(
         new CustomEvent("chat-ws-debug", {

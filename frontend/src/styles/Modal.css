@@ -1,3 +1,10 @@
+/*
+  Shared modal primitives used by room and membership dialogs.
+
+  This stylesheet provides reusable modal overlay/content structure, form stack
+  spacing, role selection button layout, and standard cancel button behavior.
+*/
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -8,6 +15,7 @@
   z-index: 100;
 }
 
+/* Modal panel container */
 .modal-content {
   background: var(--bg-panel);
   padding: 28px;
@@ -21,16 +29,19 @@
 .modal-content h3 { font-size: 1rem; }
 .modal-content p  { color: var(--text-muted); font-size: 0.85rem; }
 
+/* Embedded form layout */
 .modal-content form {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
+/* Role request actions */
 .role-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
 .role-btn { flex: 1; min-width: 70px; padding: 10px; text-align: center; }
 .role-btn.role-admin { background: #ff9500; color: white; font-weight: bold; }
 
+/* Secondary cancel action */
 .cancel-btn {
   background: transparent;
   color: var(--text-muted);

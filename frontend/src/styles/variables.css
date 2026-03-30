@@ -1,3 +1,11 @@
+/*
+  Global design tokens and baseline element styles for the chat frontend.
+
+  This stylesheet defines shared color variables, spacing/radius primitives,
+  default input/button styling, badge variants, and scrollbar appearance used
+  across all feature-specific stylesheets.
+*/
+
 :root {
   --bg-dark:       #111b21;
   --bg-panel:      #1f2c34;
@@ -14,6 +22,7 @@
   --radius:        8px;
 }
 
+/* Global reset and page baseline */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #root { height: 100%; }
 body {
@@ -46,6 +55,7 @@ button {
 button:hover { background: var(--accent-hover); }
 button:disabled { opacity: 0.5; cursor: default; }
 
+/* Shared utility states and role badges */
 .error { color: var(--danger); font-size: 0.8rem; margin-top: 6px; }
 
 .badge {
@@ -60,6 +70,8 @@ button:disabled { opacity: 0.5; cursor: default; }
 .badge-read    { background: var(--text-muted); color: #000; }
 .badge-pending { background: #6b7280; color: #fff; }
 .badge-rejected { background: var(--danger); color: #fff; }
+
+/* Scrollbar styling */
 
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

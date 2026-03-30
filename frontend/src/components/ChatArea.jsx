@@ -1,3 +1,11 @@
+/*
+ * Main chat workspace for active room conversation, typing, files, and moderation.
+
+ * This component connects room websocket streams, loads historical messages,
+ * renders message timeline and typing indicators, handles compose/send/reply
+ * flows, uploads attachments, supports admin message deletion, and exposes room
+ * controls like member panel toggling and leave-room actions.
+ */
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useChat } from "../context/ChatContext";
 import { API_BASE } from "../config.js";
@@ -9,6 +17,7 @@ import { showConfirm } from "../utils/confirm";
 import "../styles/Chat.css";
 
 export default function ChatArea() {
+  /* Renders active-room chat UI and coordinates realtime interaction handlers. */
   const { state, dispatch } = useChat();
   const { activeRoom, messages, user, onlineUsers, typingUsers, replyingTo } = state;
   const { connect, disconnect, send } = useWebSocket();
@@ -61,6 +70,7 @@ export default function ChatArea() {
   const selfName = user?.name || user?.id || "You";
 
   const handleInputChange = (e) => {
+    /* Updates draft text and emits throttled typing/start-stop typing events. */
     setText(e.target.value);
     const now = Date.now();
     if (!isTypingRef.current || now - typingHeartbeatRef.current > 900) {
@@ -79,6 +89,7 @@ export default function ChatArea() {
   };
 
   const handleSend = () => {
+    /* Sends a text message payload (with optional reply reference) to websocket. */
     if (!text.trim()) return;
     const payload = { type: "message", content: text.trim() };
     if (replyingTo) {
@@ -97,6 +108,7 @@ export default function ChatArea() {
   };
 
   const handleInputBlur = () => {
+    /* Stops typing state when message input loses focus. */
     if (isTypingRef.current) {
       isTypingRef.current = false;
       typingHeartbeatRef.current = 0;
@@ -107,6 +119,7 @@ export default function ChatArea() {
   };
 
   const handleKeyDown = (e) => {
+    /* Submits the draft on Enter and preserves multiline on Shift+Enter. */
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -114,6 +127,7 @@ export default function ChatArea() {
   };
 
   const handleFileUpload = async (e) => {
+    /* Uploads a selected file and emits a matching websocket file message event. */
     const file = e.target.files[0];
     if (!file || !activeRoom) return;
     try {
@@ -132,6 +146,7 @@ export default function ChatArea() {
 
   const handleDeleteMessage = useCallback(
     async (messageId) => {
+      /* Confirms and deletes a message for all room participants (admin only). */
       if (!activeRoom || !user) return;
       if (!await showConfirm("Delete this message for everyone in the room?")) return;
       try {
@@ -149,6 +164,7 @@ export default function ChatArea() {
 
   const handleReply = useCallback(
     (msg) => {
+      /* Stores reply target metadata and focuses the message input field. */
       dispatch({
         type: "SET_REPLYING_TO",
         payload: {
@@ -163,6 +179,7 @@ export default function ChatArea() {
   );
 
   const scrollToMessage = useCallback((messageId) => {
+    /* Scrolls to and briefly highlights a referenced message in the timeline. */
     const el = document.getElementById(`msg-${messageId}`);
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -172,6 +189,7 @@ export default function ChatArea() {
   }, []);
 
   const handleLeaveRoom = useCallback(async () => {
+    /* Leaves the active room, clears chat state, and requests room list refresh. */
     if (!activeRoom || !user) return;
     if (!await showConfirm(`Leave "${activeRoom.name}"?`)) return;
 
@@ -344,6 +362,7 @@ export default function ChatArea() {
 
 /* ── Single message bubble ── */
 function MessageBubble({ msg, userId, isAdmin, canWrite, onDelete, onReply, onClickReply }) {
+  /* Renders one chat message row, including reply quote and action buttons. */
   if (msg.type === "system") {
     return <div className="msg-system">{msg.content}</div>;
   }

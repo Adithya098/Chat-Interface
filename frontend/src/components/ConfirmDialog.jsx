@@ -1,7 +1,15 @@
+/*
+ * Central confirmation modal that resolves promise-based confirmation requests.
+ *
+ * This component listens for global confirm events, displays the requested
+ * message, and resolves the originating promise with the user's OK/Cancel
+ * decision so callers can gate destructive or sensitive actions.
+ */
 import { useState, useEffect } from "react";
 import "../styles/ConfirmDialog.css";
 
 export default function ConfirmDialog() {
+  /* Renders confirm UI when a pending confirmation request is active. */
   const [dialog, setDialog] = useState(null); // { message, resolve }
 
   useEffect(() => {
@@ -13,6 +21,7 @@ export default function ConfirmDialog() {
   if (!dialog) return null;
 
   const answer = (result) => {
+    /* Resolves the pending confirm promise and closes the dialog. */
     dialog.resolve(result);
     setDialog(null);
   };

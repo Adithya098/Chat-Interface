@@ -1,3 +1,10 @@
+/*
+  Admin join-request modal styling for multi-room approval workflows.
+
+  This file styles request grouping by room, request rows, role badges, and
+  approve/reject action buttons inside the admin moderation dialog.
+*/
+
 .admin-join-modal {
   width: min(440px, 94vw);
   max-height: min(80vh, 520px);
@@ -7,6 +14,7 @@
   gap: 10px;
 }
 
+/* Intro text and scrollable grouped sections */
 .admin-join-lead {
   margin: 0;
   font-size: 0.88rem;
@@ -22,6 +30,7 @@
   padding-right: 4px;
 }
 
+/* Room-group headings and request list rows */
 .admin-join-room-block h4 {
   font-size: 0.82rem;
   text-transform: uppercase;
@@ -51,6 +60,7 @@
   border: 1px solid var(--border);
 }
 
+/* Requester identity and action buttons */
 .admin-join-who {
   display: flex;
   align-items: center;
