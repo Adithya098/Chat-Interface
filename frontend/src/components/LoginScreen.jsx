@@ -3,40 +3,39 @@ import { useChat } from "../context/ChatContext";
 import { api } from "../hooks/useApi";
 import "../styles/Login.css";
 
-function isDuplicateEmailError(message) {
-  const m = String(message || "").toLowerCase();
-  return m.includes("already registered") || m.includes("email already");
-}
-
 export default function LoginScreen() {
   const { dispatch } = useChat();
-  const [name, setName] = useState("");
+  const [mode, setMode] = useState("login"); // "login" | "signup"
+
+  // Shared
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  // Signup only
+  const [name, setName] = useState("");
+  const [mobile, setMobile] = useState("");
+
+  const switchMode = () => {
+    setMode(mode === "login" ? "signup" : "login");
+    setError("");
+  };
+
+  const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
-    if (!name.trim() || !email.trim()) {
-      setError("Name and email are required");
+    if (!email.trim() || !password) {
+      setError("Email and password are required");
       return;
     }
 
     setLoading(true);
     try {
-      let user;
-      try {
-        user = await api("/users/", {
-          method: "POST",
-          body: JSON.stringify({ name: name.trim(), email: email.trim() }),
-        });
-      } catch (e) {
-        if (!isDuplicateEmailError(e.message)) throw e;
-        const users = await api("/users/");
-        user = users.find((u) => u.email === email.trim());
-        if (!user) throw new Error("Could not find or create user");
-      }
+      const user = await api("/users/login", {
+        method: "POST",
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
       dispatch({ type: "SET_USER", payload: user });
     } catch (err) {
       setError(err.message);
@@ -45,27 +44,109 @@ export default function LoginScreen() {
     }
   };
 
+  const handleSignup = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (!name.trim() || !email.trim() || !password || !mobile.trim()) {
+      setError("All fields are required");
+      return;
+    }
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const user = await api("/users/signup", {
+        method: "POST",
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          password,
+          mobile: mobile.trim(),
+        }),
+      });
+      dispatch({ type: "SET_USER", payload: user });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (mode === "signup") {
+    return (
+      <div className="login-screen">
+        <form className="login-card" onSubmit={handleSignup}>
+          <h1>Chat Rooms</h1>
+          <p className="subtitle">Create a new account</p>
+          <input
+            type="text"
+            placeholder="Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <input
+            type="tel"
+            placeholder="Mobile number"
+            value={mobile}
+            onChange={(e) => setMobile(e.target.value)}
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <button type="submit" disabled={loading}>
+            {loading ? "Creating account..." : "Sign Up"}
+          </button>
+          {error && <p className="error">{error}</p>}
+          <p className="switch-mode">
+            Already have an account?{" "}
+            <button type="button" className="link-btn" onClick={switchMode}>
+              Log in
+            </button>
+          </p>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div className="login-screen">
-      <form className="login-card" onSubmit={handleSubmit}>
+      <form className="login-card" onSubmit={handleLogin}>
         <h1>Chat Rooms</h1>
-        <p className="subtitle">Sign in or create an account</p>
-        <input
-          type="text"
-          placeholder="Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
+        <p className="subtitle">Log in to your account</p>
         <input
           type="email"
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
         <button type="submit" disabled={loading}>
-          {loading ? "Loading..." : "Continue"}
+          {loading ? "Logging in..." : "Log In"}
         </button>
         {error && <p className="error">{error}</p>}
+        <p className="switch-mode">
+          Don't have an account?{" "}
+          <button type="button" className="link-btn" onClick={switchMode}>
+            Sign up
+          </button>
+        </p>
       </form>
     </div>
   );

@@ -4,16 +4,18 @@ Real-time chat system built with FastAPI, WebSockets, React, and PostgreSQL (AWS
 
 ## Features
 
-- Role-based room access (`admin` / `write` / `read`)
-- Join requests with admin approve/reject flow (request any role: read, write, or admin)
-- Real-time messaging over WebSocket
-- Message replies (quoted preview + scroll-to-original)
-- Admin moderation: delete messages, remove members, and promote members to admin
-- Users can leave rooms voluntarily
-- Typing indicators with 3-second graceful fade (real-time updates)
-- Room presence (`online_users`)
-- File uploads (images, PDFs, docs)
-- Message history via REST
+- **Authentication**: Secure signup/login with bcrypt password hashing, mobile number field
+- **Role-based room access** (`admin` / `write` / `read`)
+- **Join requests** with admin approve/reject flow (request any role: read, write, or admin)
+- **Real-time messaging** over WebSocket with message replies (quoted preview + scroll-to-original)
+- **Admin moderation**: delete messages, remove members (if not last admin), promote members to admin
+- **Room management**: users can leave voluntarily, last admin protection
+- **Typing indicators** with 3-second graceful fade (real-time updates)
+- **Room presence** (`online_users` count)
+- **File uploads** (images, PDFs, docs)
+- **Message history** via REST API
+- **Toast notifications** for errors, info, and success messages
+- **Confirmation dialogs** for destructive actions (no more browser popups)
 
 ## Recent Features (Latest Updates)
 

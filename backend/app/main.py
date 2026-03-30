@@ -29,10 +29,24 @@ logging.getLogger("websockets.server").setLevel(logging.WARNING)
 FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 
 
+def _run_migrations():
+    """Add new columns to existing tables if they don't already exist."""
+    from sqlalchemy import text, inspect
+    inspector = inspect(engine)
+    if "users" in inspector.get_table_names():
+        existing = {col["name"] for col in inspector.get_columns("users")}
+        with engine.begin() as conn:
+            if "password_hash" not in existing:
+                conn.execute(text("ALTER TABLE users ADD COLUMN password_hash VARCHAR(255)"))
+            if "mobile" not in existing:
+                conn.execute(text("ALTER TABLE users ADD COLUMN mobile VARCHAR(20)"))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Create all tables on startup (only when DB is reachable)
     Base.metadata.create_all(bind=engine)
+    _run_migrations()
     yield
 
 
