@@ -1,3 +1,10 @@
+"""FastAPI application bootstrap and runtime wiring for the chat backend.
+
+This module initializes logging filters, configures startup lifecycle tasks, 
+creates database tables and lightweight migrations, 
+applies CORS policy based on environment, registers all HTTP/WebSocket routers, 
+and serves either the built frontend SPA or a development health message."""
+
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -12,7 +19,10 @@ from app.routers import users, rooms, members, ws, messages, files
 
 
 class SuppressWebSocketLifecycleLogs(logging.Filter):
+    """Filters noisy websocket lifecycle records while keeping real error logs visible."""
+
     def filter(self, record: logging.LogRecord) -> bool:
+        """Returns False for routine websocket connect/disconnect logs that should be suppressed."""
         message = record.getMessage()
         return not (
             ('"WebSocket ' in message and "[accepted]" in message)
@@ -30,7 +40,7 @@ FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "di
 
 
 def _run_migrations():
-    """Add new columns to existing tables if they don't already exist."""
+    """Applies lightweight startup migrations for missing columns on existing tables."""
     from sqlalchemy import text, inspect
     inspector = inspect(engine)
     if "users" in inspector.get_table_names():
@@ -44,6 +54,7 @@ def _run_migrations():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Initializes database schema and startup migrations before serving requests."""
     # Create all tables on startup (only when DB is reachable)
     Base.metadata.create_all(bind=engine)
     _run_migrations()
@@ -94,8 +105,10 @@ if FRONTEND_DIST.exists():
 
     @app.get("/")
     def serve_spa():
+        """Serves the built React single-page application entry HTML."""
         return FileResponse(str(FRONTEND_DIST / "index.html"))
 else:
     @app.get("/")
     def root():
+        """Returns a simple API health message for local development mode."""
         return {"message": "Chat Backend API is running. Start React dev server on port 3000."}

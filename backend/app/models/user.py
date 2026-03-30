@@ -1,9 +1,15 @@
+"""SQLAlchemy model definition for application users.
+
+This file declares the users table fields for identity and authentication-related data, 
+including display name, unique email, optional password hash/mobile, and creation timestamp metadata."""
+
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.sql import func
 from app.database import Base
 
 
 class User(Base):
+    """Represents a chat user identity with login and profile attributes."""
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)

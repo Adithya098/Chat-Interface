@@ -1,9 +1,15 @@
+"""SQLAlchemy model definition for room memberships and access control state.
+
+This file models the relationship between users and rooms, stores role and approval status, 
+tracks join time, and enforces uniqueness so each user has at most one membership record per room."""
+
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.sql import func
 from app.database import Base
 
 
 class RoomMember(Base):
+    """Represents one user-to-room membership entry including role and approval status."""
     __tablename__ = "room_members"
 
     id = Column(Integer, primary_key=True, index=True)

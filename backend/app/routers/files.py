@@ -1,3 +1,9 @@
+"""File upload and document access endpoints with authorization and storage fallback logic.
+
+This module validates room membership and write permissions, enforces file extension/size constraints, 
+stores uploads in Supabase Storage or local disk fallback, creates corresponding document/message records, 
+lists room documents, and serves or redirects secure document downloads."""
+
 import logging
 import os
 import uuid
@@ -23,10 +29,12 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 
 
 def _use_supabase_storage() -> bool:
+    """Determines whether uploads/downloads should use configured Supabase Storage."""
     return supabase_storage.storage_configured()
 
 
 def _approved_room_member(db: Session, room_id: int, user_id: int, need_write: bool = False):
+    """Returns an approved membership row, optionally requiring write/admin privileges."""
     q = db.query(RoomMember).filter(
         RoomMember.room_id == room_id,
         RoomMember.user_id == user_id,
@@ -44,6 +52,7 @@ def upload_file(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
+    """Validates and stores an uploaded file, then creates a file-type chat message record."""
     room = db.query(Room).filter(Room.id == room_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
@@ -137,6 +146,7 @@ def list_room_documents(
     user_id: int = Query(..., description="User requesting the list (must be an approved member)"),
     db: Session = Depends(get_db),
 ):
+    """Lists uploaded documents in a room for authorized members with access URLs."""
     if not db.query(Room).filter(Room.id == room_id).first():
         raise HTTPException(status_code=404, detail="Room not found")
     if not _approved_room_member(db, room_id, user_id, need_write=False):
@@ -169,6 +179,7 @@ def open_document(
     user_id: int = Query(..., description="User opening the file (must be an approved member)"),
     db: Session = Depends(get_db),
 ):
+    """Opens a document by redirecting to signed storage URL or streaming local file content."""
     doc = db.query(Document).filter(Document.file_id == file_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -208,7 +219,7 @@ def open_document(
 
 @router.get("/files/{filename}")
 def get_file(filename: str):
-    """Legacy local uploads (hex name only). New uploads use /documents/{file_id}."""
+    """Serves legacy locally stored uploads addressed by direct filename."""
     file_path = os.path.join(UPLOAD_DIR, filename)
     if not os.path.isfile(file_path):
         raise HTTPException(status_code=404, detail="File not found")

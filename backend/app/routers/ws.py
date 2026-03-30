@@ -1,3 +1,9 @@
+"""Realtime websocket endpoint for room chat event handling.
+
+This module authenticates websocket users against approved room membership, 
+manages connect/disconnect presence updates, receives message/typing/file events from clients, 
+persists chat messages, broadcasts payloads to room participants, and cleans up connection state on disconnect/errors."""
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query
 from sqlalchemy.orm import Session
 from app.database import get_db, SessionLocal
@@ -15,6 +21,7 @@ async def websocket_endpoint(
     room_id: int,
     user_id: int = Query(...),
 ):
+    """Handles websocket lifecycle for a room member, including auth checks and message fanout."""
     # Get a DB session for auth checks
     db = SessionLocal()
 

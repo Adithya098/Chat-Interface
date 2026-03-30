@@ -1,3 +1,9 @@
+"""Message retrieval and moderation endpoints for room conversations.
+
+This module returns paginated message history with sender names, 
+resolves file metadata for file-type messages, enriches replies with compact original-message snippets, 
+and allows admins to delete messages while broadcasting realtime deletion events."""
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -15,6 +21,7 @@ _DOC_PREFIX = "/documents/"
 
 
 def _file_id_from_message_content(content: str) -> str | None:
+    """Extracts the document file ID from a message content path when the prefix matches."""
     if not content.startswith(_DOC_PREFIX):
         return None
     rest = content[len(_DOC_PREFIX) :].split("?")[0].strip("/")
@@ -28,6 +35,7 @@ def get_messages(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
+    """Returns paginated room messages with sender names, file metadata, and reply snippets."""
     room = db.query(Room).filter(Room.id == room_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
@@ -100,6 +108,7 @@ async def delete_message(
     admin_id: int = Query(...),
     db: Session = Depends(get_db),
 ):
+    """Deletes a room message when requested by an approved admin and broadcasts removal."""
     # Verify admin
     admin = db.query(RoomMember).filter(
         RoomMember.room_id == room_id,

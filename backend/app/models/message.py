@@ -1,9 +1,16 @@
+"""SQLAlchemy model definition for persisted chat messages.
+
+This file represents room messages sent by users, supports text/file message types, 
+stores payload content, supports optional reply threading via self-reference, 
+and records creation timestamps for chronological retrieval."""
+
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.sql import func
 from app.database import Base
 
 
 class Message(Base):
+    """Represents a message sent in a room by a user at a specific timestamp."""
     __tablename__ = "messages"
 
     id = Column(Integer, primary_key=True, index=True)

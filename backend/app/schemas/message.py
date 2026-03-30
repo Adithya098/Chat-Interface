@@ -1,14 +1,21 @@
+"""Pydantic schemas for chat message response shaping.
+
+This module defines the message response contract returned by history APIs 
+and the compact reply snippet model used to embed minimal context for replied-to messages."""
+
 from pydantic import BaseModel
 from datetime import datetime
 
 
 class ReplySnippet(BaseModel):
+    """Compact representation of a replied-to message used in message lists."""
     id: int
     sender_name: str
     content: str
 
 
 class MessageResponse(BaseModel):
+    """Serialized chat message payload including sender, file, and reply metadata."""
     id: int
     room_id: int
     sender_id: int

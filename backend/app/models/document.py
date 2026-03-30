@@ -1,10 +1,15 @@
+"""SQLAlchemy model definition for uploaded room documents and storage metadata.
+
+This file stores stable file identifiers, ownership and room linkage, original filenames, 
+optional Supabase storage location fields, and timestamps so chat file messages can resolve secure document access."""
+
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.sql import func
 from app.database import Base
 
 
 class Document(Base):
-    """Room-shared upload: stable file_id; file bytes in Supabase Storage or local disk."""
+    """Represents an uploaded room document mapped to Supabase or local storage."""
 
     __tablename__ = "documents"
 

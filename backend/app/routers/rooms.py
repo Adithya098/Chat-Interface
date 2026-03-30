@@ -1,3 +1,8 @@
+"""Room management endpoints for creating and reading chat rooms.
+
+This module validates room creators, persists new room records, 
+auto-enrolls creators as approved admins, and provides list/detail APIs for room discovery."""
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -11,6 +16,7 @@ router = APIRouter(prefix="/rooms", tags=["rooms"])
 
 @router.post("/", response_model=RoomResponse, status_code=201)
 def create_room(room: RoomCreate, db: Session = Depends(get_db)):
+    """Creates a room and automatically adds the creator as an approved admin member."""
     # Verify creator exists
     creator = db.query(User).filter(User.id == room.created_by).first()
     if not creator:
@@ -36,11 +42,13 @@ def create_room(room: RoomCreate, db: Session = Depends(get_db)):
 
 @router.get("/", response_model=list[RoomResponse])
 def get_rooms(db: Session = Depends(get_db)):
+    """Returns all chat rooms currently stored in the system."""
     return db.query(Room).all()
 
 
 @router.get("/{room_id}", response_model=RoomResponse)
 def get_room(room_id: int, db: Session = Depends(get_db)):
+    """Returns room details for a specific room ID when it exists."""
     room = db.query(Room).filter(Room.id == room_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")

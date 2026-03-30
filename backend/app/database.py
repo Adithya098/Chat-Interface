@@ -1,3 +1,9 @@
+"""Database configuration and session lifecycle helpers for the backend.
+
+This module loads environment variables, builds a resilient SQLAlchemy database URL from DB_* settings or
+fallback values, creates the engine/session factory/base metadata, and exposes a request-scoped dependency that
+yields and safely closes DB sessions."""
+
 import os
 from pathlib import Path
 
@@ -12,8 +18,8 @@ load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
 def _database_url():
     """
-    Prefer DB_* vars so passwords with @, :, [, ] etc. are not parsed as URL delimiters.
-    Otherwise use DATABASE_URL (password must be URL-encoded if it contains reserved chars).
+    Builds the SQLAlchemy database URL from DB_* environment variables when available.
+    Falls back to DATABASE_URL or a local default string when explicit parts are missing.
     """
     user = os.getenv("DB_USER")
     host = os.getenv("DB_HOST")
@@ -45,6 +51,7 @@ Base = declarative_base()
 
 
 def get_db():
+    """Yields a database session for request handlers and always closes it afterward."""
     db = SessionLocal()
     try:
         yield db

@@ -1,3 +1,9 @@
+"""Room membership workflow endpoints for join and moderation lifecycle.
+
+This module validates room/admin access, creates join requests, 
+approves or rejects pending members, promotes members to admin, removes or disconnects members, 
+supports voluntary leave, and returns member/pending lists for moderation UIs."""
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -11,6 +17,7 @@ router = APIRouter(prefix="/rooms/{room_id}", tags=["members"])
 
 
 def _get_room_or_404(room_id: int, db: Session) -> Room:
+    """Loads a room by ID and raises a not-found error when it does not exist."""
     room = db.query(Room).filter(Room.id == room_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
@@ -18,6 +25,7 @@ def _get_room_or_404(room_id: int, db: Session) -> Room:
 
 
 def _get_admin_or_403(room_id: int, admin_id: int, db: Session) -> RoomMember:
+    """Validates that the requester is an approved room admin before protected actions."""
     admin = db.query(RoomMember).filter(
         RoomMember.room_id == room_id,
         RoomMember.user_id == admin_id,
@@ -31,6 +39,7 @@ def _get_admin_or_403(room_id: int, admin_id: int, db: Session) -> RoomMember:
 
 @router.post("/join", response_model=RoomMemberResponse, status_code=201)
 def join_room(room_id: int, req: JoinRequest, db: Session = Depends(get_db)):
+    """Creates a pending membership request for a user to join a room with a chosen role."""
     _get_room_or_404(room_id, db)
 
     # Check user exists
@@ -64,6 +73,7 @@ def join_room(room_id: int, req: JoinRequest, db: Session = Depends(get_db)):
 
 @router.post("/approve", response_model=RoomMemberResponse)
 def approve_member(room_id: int, req: ApproveRejectRequest, db: Session = Depends(get_db)):
+    """Approves a pending room membership request as an admin action."""
     _get_room_or_404(room_id, db)
     _get_admin_or_403(room_id, req.admin_id, db)
 
@@ -83,6 +93,7 @@ def approve_member(room_id: int, req: ApproveRejectRequest, db: Session = Depend
 
 @router.post("/reject", response_model=RoomMemberResponse)
 def reject_member(room_id: int, req: ApproveRejectRequest, db: Session = Depends(get_db)):
+    """Rejects a pending room membership request as an admin action."""
     _get_room_or_404(room_id, db)
     _get_admin_or_403(room_id, req.admin_id, db)
 
@@ -107,6 +118,7 @@ async def remove_member(
     admin_id: int = Query(...),
     db: Session = Depends(get_db),
 ):
+    """Removes a member from a room, disconnects them, and notifies active participants."""
     _get_room_or_404(room_id, db)
     _get_admin_or_403(room_id, admin_id, db)
 
@@ -151,13 +163,14 @@ async def remove_member(
 
 @router.get("/members", response_model=list[RoomMemberResponse])
 def list_members(room_id: int, db: Session = Depends(get_db)):
+    """Lists all membership records for a room across pending and approved statuses."""
     _get_room_or_404(room_id, db)
     return db.query(RoomMember).filter(RoomMember.room_id == room_id).all()
 
 
 @router.post("/promote")
 async def promote_member(room_id: int, req: ApproveRejectRequest, db: Session = Depends(get_db)):
-    """Admin promotes a member to admin role."""
+    """Promotes an approved room member to admin after validating requester privileges."""
     _get_room_or_404(room_id, db)
     _get_admin_or_403(room_id, req.admin_id, db)
 
@@ -191,7 +204,7 @@ async def leave_room(
     user_id: int = Query(...),
     db: Session = Depends(get_db),
 ):
-    """User leaves a room voluntarily."""
+    """Removes the requesting user from a room while protecting against last-admin exit."""
     _get_room_or_404(room_id, db)
 
     member = db.query(RoomMember).filter(
@@ -225,6 +238,7 @@ async def leave_room(
 
 @router.get("/pending", response_model=list[RoomMemberResponse])
 def list_pending(room_id: int, db: Session = Depends(get_db)):
+    """Lists pending join requests for a room to support admin moderation views."""
     _get_room_or_404(room_id, db)
     return db.query(RoomMember).filter(
         RoomMember.room_id == room_id,
