@@ -4,6 +4,7 @@ import LoginScreen from "./components/LoginScreen";
 import Sidebar from "./components/Sidebar";
 import ChatArea from "./components/ChatArea";
 import KickedBanner from "./components/KickedBanner";
+import ConfirmDialog from "./components/ConfirmDialog";
 import "./App.css";
 
 function AppInner() {
@@ -29,6 +30,7 @@ function AppInner() {
   return (
     <div className={layoutClass}>
       <KickedBanner />
+      <ConfirmDialog />
       <Sidebar onEnterRoom={handleEnterRoom} />
       <ChatArea />
     </div>

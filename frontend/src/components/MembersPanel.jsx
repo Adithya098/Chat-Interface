@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useChat } from "../context/ChatContext";
 import { api } from "../hooks/useApi";
 import { showToast } from "../utils/toast";
+import { showConfirm } from "../utils/confirm";
 import "../styles/Members.css";
 
 export default function MembersPanel({ onClose }) {
@@ -62,7 +63,7 @@ export default function MembersPanel({ onClose }) {
 
   const handleRemoveMember = async (targetUserId) => {
     if (!activeRoom || !user) return;
-    if (!window.confirm("Remove this member from the room?")) return;
+    if (!await showConfirm("Remove this member from the room?")) return;
     try {
       await api(
         `/rooms/${activeRoom.id}/members/${targetUserId}?admin_id=${user.id}`,
@@ -76,7 +77,7 @@ export default function MembersPanel({ onClose }) {
 
   const handlePromoteMember = async (targetUserId) => {
     if (!activeRoom || !user) return;
-    if (!window.confirm("Promote this member to admin?")) return;
+    if (!await showConfirm("Promote this member to admin?")) return;
     try {
       await api(`/rooms/${activeRoom.id}/promote`, {
         method: "POST",

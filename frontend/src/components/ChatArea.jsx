@@ -5,6 +5,7 @@ import { api, uploadFile } from "../hooks/useApi";
 import { useWebSocket } from "../hooks/useWebSocket";
 import MembersPanel from "./MembersPanel";
 import { showToast } from "../utils/toast";
+import { showConfirm } from "../utils/confirm";
 import "../styles/Chat.css";
 
 export default function ChatArea() {
@@ -132,7 +133,7 @@ export default function ChatArea() {
   const handleDeleteMessage = useCallback(
     async (messageId) => {
       if (!activeRoom || !user) return;
-      if (!window.confirm("Delete this message for everyone in the room?")) return;
+      if (!await showConfirm("Delete this message for everyone in the room?")) return;
       try {
         await api(
           `/rooms/${activeRoom.id}/messages/${messageId}?admin_id=${user.id}`,
@@ -172,7 +173,7 @@ export default function ChatArea() {
 
   const handleLeaveRoom = useCallback(async () => {
     if (!activeRoom || !user) return;
-    if (!window.confirm(`Leave "${activeRoom.name}"?`)) return;
+    if (!await showConfirm(`Leave "${activeRoom.name}"?`)) return;
 
     try {
       await api(
