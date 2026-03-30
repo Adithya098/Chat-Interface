@@ -56,6 +56,8 @@ export default function ChatArea() {
   }, []);
 
   // Typing events
+  const selfName = user?.name || user?.id || "You";
+
   const handleInputChange = (e) => {
     setText(e.target.value);
     const now = Date.now();
@@ -63,12 +65,14 @@ export default function ChatArea() {
       isTypingRef.current = true;
       typingHeartbeatRef.current = now;
       send({ type: "typing" });
+      dispatch({ type: "ADD_TYPING", payload: selfName });
     }
     clearTimeout(typingTimerRef.current);
     typingTimerRef.current = setTimeout(() => {
       isTypingRef.current = false;
       typingHeartbeatRef.current = 0;
       send({ type: "stop_typing" });
+      dispatch({ type: "REMOVE_TYPING", payload: selfName });
     }, 10000);
   };
 
@@ -86,6 +90,7 @@ export default function ChatArea() {
       typingHeartbeatRef.current = 0;
       clearTimeout(typingTimerRef.current);
       send({ type: "stop_typing" });
+      dispatch({ type: "REMOVE_TYPING", payload: selfName });
     }
   };
 
@@ -95,6 +100,7 @@ export default function ChatArea() {
       typingHeartbeatRef.current = 0;
       clearTimeout(typingTimerRef.current);
       send({ type: "stop_typing" });
+      dispatch({ type: "REMOVE_TYPING", payload: selfName });
     }
   };
 
@@ -176,7 +182,7 @@ export default function ChatArea() {
   const canWrite = activeRoom.role === "write" || activeRoom.role === "admin";
   const isAdmin = activeRoom.role === "admin";
   const typingNames = Object.keys(typingUsers);
-  const typingDebugText = typingNames.length ? typingNames.join(", ") : (lastTypingUser || "none");
+  const typingDebugText = typingNames.length ? typingNames.join(", ") : "none";
   const typingLabel =
     typingNames.length === 1
       ? `${typingNames[0]} is typing...`
@@ -219,6 +225,18 @@ export default function ChatArea() {
           </div>
         </div>
 
+        {/* Typing bar — always rendered below header, empty when nobody typing */}
+        <div className="typing-bar">
+          {typingLabel ? (
+            <>
+              <span className="typing-dots">
+                <span /><span /><span />
+              </span>
+              {typingLabel}
+            </>
+          ) : null}
+        </div>
+
         {/* Messages */}
         <div className="messages-container">
           {messages.map((msg, i) => (
@@ -235,16 +253,6 @@ export default function ChatArea() {
           ))}
           <div ref={messagesEndRef} />
         </div>
-
-        {/* Typing indicator — shown to all users regardless of role */}
-        {typingLabel && (
-          <div className="typing-indicator">
-            <span className="typing-dots">
-              <span /><span /><span />
-            </span>
-            {typingLabel}
-          </div>
-        )}
 
         {/* Compose or read-only */}
         {canWrite ? (

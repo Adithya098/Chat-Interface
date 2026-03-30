@@ -80,7 +80,12 @@ export function useWebSocket() {
               detail: { direction: "in", type: "stop_typing", user: data.user_name, at: Date.now() },
             })
           );
-          dispatch({ type: "REMOVE_TYPING", payload: data.user_name });
+          // Don't remove immediately — keep visible for 3s so others can see it
+          clearTimeout(typingTimers.current[data.user_name]);
+          typingTimers.current[data.user_name] = setTimeout(() => {
+            dispatch({ type: "REMOVE_TYPING", payload: data.user_name });
+            delete typingTimers.current[data.user_name];
+          }, 3000);
           break;
 
         case "system":
