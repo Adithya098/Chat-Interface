@@ -4,7 +4,7 @@ from datetime import datetime
 
 class JoinRequest(BaseModel):
     user_id: int
-    role: str = "write"  # read | write
+    role: str = "write"  # read | write | admin
 
 
 class ApproveRejectRequest(BaseModel):

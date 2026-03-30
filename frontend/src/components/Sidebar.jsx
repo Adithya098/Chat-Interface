@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useChat } from "../context/ChatContext";
 import { api } from "../hooks/useApi";
+import { showToast } from "../utils/toast";
 import JoinModal from "./JoinModal";
 import CreateRoomModal from "./CreateRoomModal";
 import AdminJoinRequestsModal from "./AdminJoinRequestsModal";
@@ -147,9 +148,9 @@ export default function Sidebar({ onEnterRoom }) {
     if (m && m.status === "approved") {
       onEnterRoom(room, m.role);
     } else if (m && m.status === "pending") {
-      alert("Your join request is pending admin approval.");
+      showToast("Your join request is pending admin approval.", "info");
     } else if (m && m.status === "rejected") {
-      alert("Your join request was rejected.");
+      showToast("Your join request was rejected.", "error");
     } else {
       setJoinTarget(room);
     }

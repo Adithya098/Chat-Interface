@@ -16,11 +16,11 @@ class ConnectionManager:
             self.rooms[room_id][user_id] = []
         self.rooms[room_id][user_id].append(websocket)
 
-        # Notify room that user joined
-        await self.broadcast(room_id, {
-            "type": "system",
-            "content": f"User {user_id} joined the room",
-        }, exclude_user=user_id)
+        # Notify room that user joined (disabled)
+        # await self.broadcast(room_id, {
+        #     "type": "system",
+        #     "content": f"User {user_id} joined the room",
+        # }, exclude_user=user_id)
 
     def disconnect(self, room_id: int, user_id: int, websocket: WebSocket | None = None):
         if room_id in self.rooms:

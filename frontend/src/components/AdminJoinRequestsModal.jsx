@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { api } from "../hooks/useApi";
+import { showToast } from "../utils/toast";
 import "../styles/Modal.css";
 import "../styles/AdminJoinRequestsModal.css";
 
@@ -38,7 +39,7 @@ export default function AdminJoinRequestsModal({ bundles, user, onClose, onChang
       });
       onChanged();
     } catch (err) {
-      alert(err.message);
+      showToast(err.message);
     }
   };
 

@@ -118,7 +118,9 @@ export function useWebSocket() {
 
         case "kicked":
           skipReconnectRef.current = true;
-          alert(data.content || "You were removed from this room");
+          window.dispatchEvent(new CustomEvent("chat-kicked", {
+            detail: { message: data.content || "You were removed from this room" },
+          }));
           dispatch({ type: "SET_ACTIVE_ROOM", payload: null });
           dispatch({ type: "SET_MESSAGES", payload: [] });
           window.dispatchEvent(new CustomEvent("chat-refresh-rooms"));

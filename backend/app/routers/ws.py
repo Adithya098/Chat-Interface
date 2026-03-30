@@ -111,7 +111,7 @@ async def websocket_endpoint(
                     msg_db.close()
 
             elif msg_type == "typing":
-                print(f"[WS][typing-in] room={room_id} user_id={user_id} user_name={user_name}", flush=True)
+                # print(f"[WS][typing-in] room={room_id} user_id={user_id} user_name={user_name}", flush=True)
                 await manager.broadcast(room_id, {
                     "type": "typing",
                     "user_id": user_id,
@@ -119,7 +119,7 @@ async def websocket_endpoint(
                 }, exclude_websocket=websocket)
 
             elif msg_type == "stop_typing":
-                print(f"[WS][stop-typing-in] room={room_id} user_id={user_id} user_name={user_name}", flush=True)
+                # print(f"[WS][stop-typing-in] room={room_id} user_id={user_id} user_name={user_name}", flush=True)
                 await manager.broadcast(room_id, {
                     "type": "stop_typing",
                     "user_id": user_id,
@@ -153,10 +153,11 @@ async def websocket_endpoint(
             "user_id": user_id,
             "user_name": user_name,
         })
-        await manager.broadcast(room_id, {
-            "type": "system",
-            "content": f"User {user_id} left the room",
-        })
+        # User left notification (disabled)
+        # await manager.broadcast(room_id, {
+        #     "type": "system",
+        #     "content": f"User {user_id} left the room",
+        # })
         online = manager.get_online_users(room_id)
         await manager.broadcast(room_id, {
             "type": "online_users",

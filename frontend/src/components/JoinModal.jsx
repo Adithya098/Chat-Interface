@@ -48,7 +48,7 @@ export default function JoinModal({ room, onClose, onJoined }) {
         ) : (
           <>
             <h3>Join Room: {room.name}</h3>
-            <p>Request access as a reader or writer. An admin must approve.</p>
+            <p>Request access. An admin must approve your request.</p>
             <div className="role-buttons">
               <button
                 type="button"
@@ -65,6 +65,14 @@ export default function JoinModal({ room, onClose, onJoined }) {
                 disabled={loading}
               >
                 Writer
+              </button>
+              <button
+                type="button"
+                className="role-btn role-admin"
+                onClick={() => handleJoin("admin")}
+                disabled={loading}
+              >
+                Admin
               </button>
             </div>
             <button type="button" className="cancel-btn" onClick={handleClose}>

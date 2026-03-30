@@ -3,6 +3,7 @@ import { ChatProvider, useChat } from "./context/ChatContext";
 import LoginScreen from "./components/LoginScreen";
 import Sidebar from "./components/Sidebar";
 import ChatArea from "./components/ChatArea";
+import KickedBanner from "./components/KickedBanner";
 import "./App.css";
 
 function AppInner() {
@@ -27,6 +28,7 @@ function AppInner() {
 
   return (
     <div className={layoutClass}>
+      <KickedBanner />
       <Sidebar onEnterRoom={handleEnterRoom} />
       <ChatArea />
     </div>

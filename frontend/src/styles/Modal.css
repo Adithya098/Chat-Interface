@@ -27,8 +27,9 @@
   gap: 12px;
 }
 
-.role-buttons { display: flex; gap: 10px; }
-.role-btn { flex: 1; padding: 10px; text-align: center; }
+.role-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+.role-btn { flex: 1; min-width: 70px; padding: 10px; text-align: center; }
+.role-btn.role-admin { background: #ff9500; color: white; font-weight: bold; }
 
 .cancel-btn {
   background: transparent;

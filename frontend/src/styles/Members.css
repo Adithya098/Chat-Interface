@@ -38,6 +38,19 @@
   gap: 8px;
   flex-shrink: 0;
 }
+.btn-promote {
+  font-size: 0.72rem;
+  padding: 4px 8px;
+  background: transparent;
+  color: #ff9500;
+  border: 1px solid #ff9500;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.btn-promote:hover {
+  background: rgba(255, 149, 0, 0.15);
+}
+
 .btn-remove {
   font-size: 0.72rem;
   padding: 4px 8px;

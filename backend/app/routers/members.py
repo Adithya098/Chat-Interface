@@ -47,8 +47,8 @@ def join_room(room_id: int, req: JoinRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Already a member or pending request exists")
 
     # Validate role
-    if req.role not in ("read", "write"):
-        raise HTTPException(status_code=400, detail="Role must be 'read' or 'write'")
+    if req.role not in ("read", "write", "admin"):
+        raise HTTPException(status_code=400, detail="Role must be 'read', 'write', or 'admin'")
 
     member = RoomMember(
         user_id=req.user_id,
@@ -120,13 +120,30 @@ async def remove_member(
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
 
+    # Prevent removing admin if they're the last admin
     if member.role == "admin":
-        raise HTTPException(status_code=400, detail="Cannot remove another admin")
+        admin_count = db.query(RoomMember).filter(
+            RoomMember.room_id == room_id,
+            RoomMember.role == "admin",
+            RoomMember.status == "approved",
+        ).count()
+        if admin_count <= 1:
+            raise HTTPException(status_code=400, detail="Cannot remove the last admin")
+
+    # Fetch room and admin names for the notification message
+    room = db.query(Room).filter(Room.id == room_id).first()
+    admin_user = db.query(User).filter(User.id == admin_id).first()
+    room_name = room.name if room else f"room {room_id}"
+    admin_name = admin_user.name if admin_user else f"Admin {admin_id}"
 
     db.delete(member)
     db.commit()
 
-    await manager.kick_user(room_id, user_id)
+    await manager.kick_user(
+        room_id,
+        user_id,
+        reason=f"You were removed from '{room_name}' by {admin_name}",
+    )
     await manager.broadcast(room_id, {"type": "member_removed", "user_id": user_id})
 
     return {"detail": "Member removed"}
@@ -136,6 +153,74 @@ async def remove_member(
 def list_members(room_id: int, db: Session = Depends(get_db)):
     _get_room_or_404(room_id, db)
     return db.query(RoomMember).filter(RoomMember.room_id == room_id).all()
+
+
+@router.post("/promote")
+async def promote_member(room_id: int, req: ApproveRejectRequest, db: Session = Depends(get_db)):
+    """Admin promotes a member to admin role."""
+    _get_room_or_404(room_id, db)
+    _get_admin_or_403(room_id, req.admin_id, db)
+
+    member = db.query(RoomMember).filter(
+        RoomMember.room_id == room_id,
+        RoomMember.user_id == req.user_id,
+        RoomMember.status == "approved",
+    ).first()
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+
+    if member.role == "admin":
+        raise HTTPException(status_code=400, detail="User is already an admin")
+
+    member.role = "admin"
+    db.commit()
+    db.refresh(member)
+
+    # Promoted to admin notification (disabled)
+    # await manager.broadcast(room_id, {
+    #     "type": "system",
+    #     "content": f"User {req.user_id} was promoted to admin",
+    # })
+
+    return member
+
+
+@router.post("/leave")
+async def leave_room(
+    room_id: int,
+    user_id: int = Query(...),
+    db: Session = Depends(get_db),
+):
+    """User leaves a room voluntarily."""
+    _get_room_or_404(room_id, db)
+
+    member = db.query(RoomMember).filter(
+        RoomMember.room_id == room_id,
+        RoomMember.user_id == user_id,
+    ).first()
+    if not member:
+        raise HTTPException(status_code=404, detail="Not a member of this room")
+
+    # Prevent the last admin from leaving
+    if member.role == "admin":
+        admin_count = db.query(RoomMember).filter(
+            RoomMember.room_id == room_id,
+            RoomMember.role == "admin",
+            RoomMember.status == "approved",
+        ).count()
+        if admin_count == 1:
+            raise HTTPException(status_code=400, detail="Cannot leave: you are the only admin")
+
+    db.delete(member)
+    db.commit()
+
+    await manager.kick_user(room_id, user_id, reason="You left the room")
+    await manager.broadcast(room_id, {
+        "type": "system",
+        "content": f"User {user_id} left the room",
+    })
+
+    return {"detail": "Left room successfully"}
 
 
 @router.get("/pending", response_model=list[RoomMemberResponse])

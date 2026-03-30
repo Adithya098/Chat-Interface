@@ -4,6 +4,7 @@ import { API_BASE } from "../config.js";
 import { api, uploadFile } from "../hooks/useApi";
 import { useWebSocket } from "../hooks/useWebSocket";
 import MembersPanel from "./MembersPanel";
+import { showToast } from "../utils/toast";
 import "../styles/Chat.css";
 
 export default function ChatArea() {
@@ -123,7 +124,7 @@ export default function ChatArea() {
         filename: data.filename,
       });
     } catch (err) {
-      alert("Upload failed: " + err.message);
+      showToast("Upload failed: " + err.message);
     }
     e.target.value = "";
   };
@@ -139,7 +140,7 @@ export default function ChatArea() {
         );
         dispatch({ type: "REMOVE_MESSAGE", payload: messageId });
       } catch (err) {
-        alert(err.message);
+        showToast(err.message);
       }
     },
     [activeRoom?.id, user, dispatch]
@@ -169,6 +170,23 @@ export default function ChatArea() {
     }
   }, []);
 
+  const handleLeaveRoom = useCallback(async () => {
+    if (!activeRoom || !user) return;
+    if (!window.confirm(`Leave "${activeRoom.name}"?`)) return;
+
+    try {
+      await api(
+        `/rooms/${activeRoom.id}/leave?user_id=${user.id}`,
+        { method: "POST" }
+      );
+      dispatch({ type: "SET_ACTIVE_ROOM", payload: null });
+      dispatch({ type: "SET_MESSAGES", payload: [] });
+      window.dispatchEvent(new CustomEvent("chat-refresh-rooms"));
+    } catch (err) {
+      showToast(err.message);
+    }
+  }, [activeRoom?.id, user?.id, dispatch]);
+
   if (!activeRoom) {
     return (
       <main className="chat-area">
@@ -195,11 +213,12 @@ export default function ChatArea() {
   return (
     <main className="chat-area">
       <div className="chat-view">
-        <div className="typing-debug-panel">
+        {/* Debug panel - disabled */}
+        {/* <div className="typing-debug-panel">
           <div>self user: {user?.name || user?.id || "unknown"}</div>
           <div>typingUsers: {typingDebugText}</div>
           <div>ws IN: {wsTypingInDebug}</div>
-        </div>
+        </div> */}
 
         {/* Header */}
         <div className="chat-header">
@@ -221,6 +240,14 @@ export default function ChatArea() {
               onClick={() => setShowMembers((v) => !v)}
             >
               Members
+            </button>
+            <button
+              className="leave-btn"
+              onClick={handleLeaveRoom}
+              title="Leave this room"
+              aria-label="Leave room"
+            >
+              Leave
             </button>
           </div>
         </div>

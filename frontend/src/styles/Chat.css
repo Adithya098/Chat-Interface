@@ -89,6 +89,20 @@
 }
 .members-btn:hover { color: var(--text); border-color: var(--text-muted); background: transparent; }
 
+.leave-btn {
+  background: transparent;
+  color: #ff6b6b;
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  border: 1px solid #ff6b6b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.leave-btn:hover {
+  background: #ff6b6b;
+  color: white;
+}
+
 /* ── Typing bar (below header, always occupies space) ── */
 .typing-bar {
   height: 22px;

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useChat } from "../context/ChatContext";
 import { api } from "../hooks/useApi";
+import { showToast } from "../utils/toast";
 import "../styles/Members.css";
 
 export default function MembersPanel({ onClose }) {
@@ -69,7 +70,21 @@ export default function MembersPanel({ onClose }) {
       );
       loadMembers();
     } catch (err) {
-      alert(err.message);
+      showToast(err.message);
+    }
+  };
+
+  const handlePromoteMember = async (targetUserId) => {
+    if (!activeRoom || !user) return;
+    if (!window.confirm("Promote this member to admin?")) return;
+    try {
+      await api(`/rooms/${activeRoom.id}/promote`, {
+        method: "POST",
+        body: JSON.stringify({ admin_id: user.id, user_id: targetUserId }),
+      });
+      loadMembers();
+    } catch (err) {
+      showToast(err.message);
     }
   };
 
@@ -81,7 +96,7 @@ export default function MembersPanel({ onClose }) {
       });
       loadMembers();
     } catch (err) {
-      alert(err.message);
+      showToast(err.message);
     }
   };
 
@@ -94,7 +109,15 @@ export default function MembersPanel({ onClose }) {
 
       <div className="members-list">
         {members.map((m) => {
+          // Count admins to determine if we can remove one
+          const adminCount = members.filter(mem => mem.role === "admin").length;
+
           const canRemove =
+            isAdmin &&
+            Number(m.user_id) !== Number(user?.id) &&
+            !(m.role === "admin" && adminCount <= 1); // Allow removal of admin if count > 1
+
+          const canPromote =
             isAdmin &&
             Number(m.user_id) !== Number(user?.id) &&
             m.role !== "admin";
@@ -103,6 +126,16 @@ export default function MembersPanel({ onClose }) {
               <span className="name">{names[m.user_id] || `User ${m.user_id}`}</span>
               <span className="member-row-actions">
                 <span className={`badge badge-${m.role}`}>{m.role}</span>
+                {canPromote && (
+                  <button
+                    type="button"
+                    className="btn-promote"
+                    title="Promote to admin"
+                    onClick={() => handlePromoteMember(m.user_id)}
+                  >
+                    Promote
+                  </button>
+                )}
                 {canRemove && (
                   <button
                     type="button"
