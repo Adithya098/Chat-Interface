@@ -127,11 +127,27 @@ export default function ChatArea() {
   };
 
   const handleFileUpload = async (e) => {
-    /* Uploads a selected file and emits a matching websocket file message event. */
+    /* Uploads a selected file, shows it locally, and notifies the room via websocket. */
     const file = e.target.files[0];
     if (!file || !activeRoom) return;
     try {
       const data = await uploadFile(activeRoom.id, user.id, file);
+
+      // Optimistic local update — show the message immediately
+      dispatch({
+        type: "ADD_MESSAGE",
+        payload: {
+          id: data.message_id,
+          sender_id: user.id,
+          sender_name: user.name,
+          type: "file",
+          content: data.file_url,
+          filename: data.filename,
+          created_at: new Date().toISOString(),
+        },
+      });
+
+      // Notify others in the room via websocket
       send({
         type: "file",
         message_id: data.message_id,
@@ -328,6 +344,7 @@ export default function ChatArea() {
                   ref={fileInputRef}
                   type="file"
                   hidden
+                  accept="image/*,audio/*,video/*,.pdf,.txt,.doc,.docx,.csv,.zip"
                   onChange={handleFileUpload}
                 />
               </label>
@@ -363,6 +380,8 @@ export default function ChatArea() {
 /* ── Single message bubble ── */
 function MessageBubble({ msg, userId, isAdmin, canWrite, onDelete, onReply, onClickReply }) {
   /* Renders one chat message row, including reply quote and action buttons. */
+  const [expanded, setExpanded] = useState(false);
+
   if (msg.type === "system") {
     return <div className="msg-system">{msg.content}</div>;
   }
@@ -397,16 +416,101 @@ function MessageBubble({ msg, userId, isAdmin, canWrite, onDelete, onReply, onCl
           )}
 
           {msg.type === "file" ? (
-            <div className="text">
-              <a
-                className="file-link"
-                href={`${API_BASE}${msg.content}?user_id=${userId}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {msg.filename || "Attachment"}
-              </a>
-            </div>
+            (() => {
+              const url = `${API_BASE}${msg.content}?user_id=${userId}`;
+              const name = (msg.filename || "").toLowerCase();
+              const ext = name.slice(name.lastIndexOf("."));
+              const imageExts = [".png", ".jpg", ".jpeg", ".gif"];
+              const audioExts = [".mp3", ".wav", ".ogg", ".m4a", ".flac", ".aac"];
+              const videoExts = [".mp4", ".webm", ".mov", ".avi", ".mkv"];
+
+              if (imageExts.includes(ext)) {
+                return (
+                  <div className="file-attachment">
+                    <img
+                      className="file-preview-img"
+                      src={url}
+                      alt={msg.filename}
+                      loading="lazy"
+                      onClick={() => setExpanded(true)}
+                    />
+                    <div className="file-attachment-actions">
+                      <button
+                        type="button"
+                        className="file-action-btn"
+                        title="Expand"
+                        onClick={() => setExpanded(true)}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                        Expand
+                      </button>
+                      <a className="file-action-btn" href={url} download={msg.filename} title="Download">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Download
+                      </a>
+                    </div>
+                    {expanded && (
+                      <div className="file-expand-overlay" onClick={() => setExpanded(false)}>
+                        <img src={url} alt={msg.filename} className="file-expand-img" />
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              if (audioExts.includes(ext)) {
+                return (
+                  <div className="file-attachment">
+                    <div className="file-attachment-name">{msg.filename}</div>
+                    <audio controls preload="none" src={url} style={{ width: "100%" }} />
+                    <div className="file-attachment-actions">
+                      <a className="file-action-btn" href={url} download={msg.filename} title="Download">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Download
+                      </a>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (videoExts.includes(ext)) {
+                return (
+                  <div className="file-attachment">
+                    <div className="file-attachment-name">{msg.filename}</div>
+                    <video controls preload="none" src={url} className="file-preview-video" />
+                    <div className="file-attachment-actions">
+                      <a className="file-action-btn" href={url} download={msg.filename} title="Download">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Download
+                      </a>
+                    </div>
+                  </div>
+                );
+              }
+
+              // Documents and other files
+              return (
+                <div className="file-attachment">
+                  <div className="file-attachment-name">{msg.filename || "Attachment"}</div>
+                  <div className="file-attachment-actions">
+                    <a
+                      className="file-action-btn"
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Open"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                      Open
+                    </a>
+                    <a className="file-action-btn" href={url} download={msg.filename} title="Download">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                      Download
+                    </a>
+                  </div>
+                </div>
+              );
+            })()
           ) : (
             <div className="text">{msg.content}</div>
           )}

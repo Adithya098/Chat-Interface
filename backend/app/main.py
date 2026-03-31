@@ -9,13 +9,17 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from app.database import engine, Base
+from fastapi.responses import FileResponse, JSONResponse
+from sqlalchemy import text
+from app.database import engine, SessionLocal, Base
 import app.models  # noqa: F401 — register all models (including Document) for metadata.create_all
 from app.routers import users, rooms, members, ws, messages, files
+
+# Tracks whether the database was reachable at startup
+_db_healthy = False
 
 
 class SuppressWebSocketLifecycleLogs(logging.Filter):
@@ -55,9 +59,15 @@ def _run_migrations():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initializes database schema and startup migrations before serving requests."""
-    # Create all tables on startup (only when DB is reachable)
-    Base.metadata.create_all(bind=engine)
-    _run_migrations()
+    global _db_healthy
+    try:
+        Base.metadata.create_all(bind=engine)
+        _run_migrations()
+        _db_healthy = True
+    except Exception as e:
+        _db_healthy = False
+        logging.error(f"[DB] Database unreachable at startup: {e}")
+        logging.warning("[DB] Server will start but all API requests will return 503 until DB is available.")
     yield
 
 
@@ -90,6 +100,46 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def db_health_check(request: Request, call_next):
+    """Returns 503 on all API requests when the database is not reachable."""
+    is_websocket = request.headers.get("upgrade", "").lower() == "websocket"
+    skip_paths = ("/assets", "/health", "/db_health")
+    if not _db_healthy and not is_websocket and not any(request.url.path.startswith(p) for p in skip_paths):
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "Database connection is down. Contact Adithya."},
+        )
+    return await call_next(request)
+
+
+@app.get("/health")
+def health():
+    """Returns DB status. Middleware returns 503 automatically when DB is down."""
+    return {"status": "ok"}
+
+
+@app.get("/db_health")
+def db_health():
+    """Live database connectivity check — probes the DB and updates the global health flag."""
+    global _db_healthy
+    try:
+        db = SessionLocal()
+        try:
+            db.execute(text("SELECT 1"))
+            _db_healthy = True
+            return {"status": "ok", "db": True}
+        finally:
+            db.close()
+    except Exception as e:
+        _db_healthy = False
+        logging.warning(f"[DB] Health check failed: {e}")
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "db": False, "detail": "Database connection is down. Contact Adithya."},
+        )
+
 
 app.include_router(users.router)
 app.include_router(rooms.router)

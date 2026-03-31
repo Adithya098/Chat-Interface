@@ -14,7 +14,7 @@ import CreateRoomModal from "./CreateRoomModal";
 import AdminJoinRequestsModal from "./AdminJoinRequestsModal";
 import "../styles/Sidebar.css";
 
-export default function Sidebar({ onEnterRoom }) {
+export default function Sidebar({ onEnterRoom, theme, onToggleTheme }) {
   /* Renders room list UI and coordinates room selection and room-level actions. */
   const { state, dispatch } = useChat();
   const { user, rooms, activeRoom } = state;
@@ -210,6 +210,14 @@ export default function Sidebar({ onEnterRoom }) {
               title="Create room"
             >
               +
+            </button>
+            <button
+              type="button"
+              className="theme-toggle sidebar-theme-toggle"
+              onClick={onToggleTheme}
+              title="Toggle theme"
+            >
+              {theme === "dark" ? "Light" : "Dark"}
             </button>
           </div>
         </div>

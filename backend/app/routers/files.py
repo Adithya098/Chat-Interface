@@ -24,8 +24,14 @@ router = APIRouter(tags=["files"])
 logger = logging.getLogger(__name__)
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
-ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".pdf", ".txt", ".doc", ".docx", ".csv", ".zip"}
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+ALLOWED_EXTENSIONS = {
+    ".png", ".jpg", ".jpeg", ".gif", ".pdf", ".txt", ".doc", ".docx", ".csv", ".zip",
+    # audio
+    ".mp3", ".wav", ".ogg", ".m4a", ".flac", ".aac",
+    # video
+    ".mp4", ".webm", ".mov", ".avi", ".mkv",
+}
+MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
 
 
 def _use_supabase_storage() -> bool:

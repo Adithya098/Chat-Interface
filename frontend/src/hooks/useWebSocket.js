@@ -53,6 +53,8 @@ export function useWebSocket() {
           break;
 
         case "file":
+          // Skip if this is our own upload (already added optimistically)
+          if (data.sender_id === userId) break;
           dispatch({
             type: "ADD_MESSAGE",
             payload: {

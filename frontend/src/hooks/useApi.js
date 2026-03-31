@@ -9,6 +9,9 @@ import { API_BASE } from "../config.js";
 
 const BASE = API_BASE;
 
+// Prevent duplicate 503 toasts when multiple requests fail simultaneously
+let _last503Toast = 0;
+
 const API_TIMEOUT_MS = 30_000;
 
 function formatDetail(detail) {
@@ -56,7 +59,16 @@ export async function api(path, opts = {}) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(formatDetail(err.detail) || res.statusText);
+    const message = formatDetail(err.detail) || res.statusText;
+    if (res.status === 503) {
+      const now = Date.now();
+      if (now - _last503Toast > 5000) {
+        _last503Toast = now;
+        const { showToast } = await import("../utils/toast.js");
+        showToast(message, "error");
+      }
+    }
+    throw new Error(message);
   }
   return res.json();
 }

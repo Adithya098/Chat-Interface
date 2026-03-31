@@ -24,8 +24,13 @@ async def websocket_endpoint(
     """Handles websocket lifecycle for a room member, including auth checks and message fanout."""
     # Get a DB session for auth checks
     db = SessionLocal()
+    accepted = False
 
     try:
+        # Accept first so all failures can return a proper websocket close frame.
+        await websocket.accept()
+        accepted = True
+
         # 1. Verify user exists
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
@@ -55,6 +60,8 @@ async def websocket_endpoint(
         })
 
     except Exception:
+        if accepted:
+            await websocket.close(code=1011, reason="Internal server error")
         db.close()
         return
 

@@ -19,6 +19,8 @@ export default defineConfig({
       '/rooms':     proxyToApi,
       '/documents': proxyToApi,
       '/files':     proxyToApi,
+      '/health':    proxyToApi,
+      '/db_health': proxyToApi,
     },
   },
 })

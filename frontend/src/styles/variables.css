@@ -19,7 +19,34 @@
   --bubble-in:     #202c33;
   --border:        #2a3942;
   --danger:        #ea4335;
+  --toast-bg-error: #2a1a1a;
+  --toast-bg-info: #1a1a2a;
+  --toast-bg-success: #1a2a1a;
+  --toast-text: #f0f0f0;
+  --toast-close: #888888;
+  --toast-close-hover: #ffffff;
   --radius:        8px;
+}
+
+[data-theme="light"] {
+  --bg-dark: #f7f2ec;
+  --bg-panel: #fffaf5;
+  --bg-chat: #f6ede3;
+  --bg-input: #ffffff;
+  --accent: #8b5e3c;
+  --accent-hover: #744b2e;
+  --text: #2e2219;
+  --text-muted: #7b6a5a;
+  --bubble-out: #e1c1a2;
+  --bubble-in: #ecd7c3;
+  --border: #d8c1ab;
+  --danger: #c1443f;
+  --toast-bg-error: #fde8e7;
+  --toast-bg-info: #eaf2ff;
+  --toast-bg-success: #e8f7ec;
+  --toast-text: #2e2219;
+  --toast-close: #6f5c4b;
+  --toast-close-hover: #2e2219;
 }
 
 /* Global reset and page baseline */
