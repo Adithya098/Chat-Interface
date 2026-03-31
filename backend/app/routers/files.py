@@ -31,7 +31,7 @@ ALLOWED_EXTENSIONS = {
     # video
     ".mp4", ".webm", ".mov", ".avi", ".mkv",
 }
-MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 
 
 def _use_supabase_storage() -> bool:
@@ -74,7 +74,7 @@ def upload_file(
 
     contents = file.file.read()
     if len(contents) > MAX_FILE_SIZE:
-        raise HTTPException(status_code=400, detail="File too large (max 10 MB)")
+        raise HTTPException(status_code=400, detail="File size larger than 10MB. Cannot send.")
 
     file_id = str(uuid.uuid4())
     stored_suffix = f"{file_id}{ext}"

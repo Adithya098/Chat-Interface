@@ -172,6 +172,7 @@ export function useWebSocket() {
     }
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(data));
+      return true;
     } else if (data?.type === "typing" || data?.type === "stop_typing") {
       window.dispatchEvent(
         new CustomEvent("chat-ws-debug", {
@@ -184,6 +185,7 @@ export function useWebSocket() {
         })
       );
     }
+    return false;
   }, []);
 
   // Cleanup on unmount

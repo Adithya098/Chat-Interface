@@ -18,6 +18,7 @@ from app.schemas.message import MessageResponse, ReplySnippet
 router = APIRouter(prefix="/rooms/{room_id}/messages", tags=["messages"])
 
 _DOC_PREFIX = "/documents/"
+_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
 
 def _file_id_from_message_content(content: str) -> str | None:
@@ -26,6 +27,16 @@ def _file_id_from_message_content(content: str) -> str | None:
         return None
     rest = content[len(_DOC_PREFIX) :].split("?")[0].strip("/")
     return rest or None
+
+
+def _is_image_filename(filename: str | None) -> bool:
+    """Determines whether a filename extension represents an image preview type."""
+    if not filename:
+        return False
+    dot = filename.rfind(".")
+    if dot == -1:
+        return False
+    return filename[dot:].lower() in _IMAGE_EXTENSIONS
 
 
 @router.get("/", response_model=list[MessageResponse])
@@ -73,12 +84,29 @@ def get_messages(
             .filter(Message.id.in_(reply_ids))
             .all()
         )
+        reply_file_ids = [
+            fid
+            for orig_msg, _ in orig_rows
+            if orig_msg.type == "file" and (fid := _file_id_from_message_content(orig_msg.content))
+        ]
+        reply_filenames: dict[str, str] = {}
+        if reply_file_ids:
+            for doc in db.query(Document).filter(Document.file_id.in_(reply_file_ids)).all():
+                reply_filenames[doc.file_id] = doc.original_filename
+
         for orig_msg, orig_name in orig_rows:
-            preview = orig_msg.content[:120]
+            file_id = _file_id_from_message_content(orig_msg.content) if orig_msg.type == "file" else None
+            filename = reply_filenames.get(file_id) if file_id else None
+            is_image = _is_image_filename(filename)
+            preview = (filename or "Attachment") if orig_msg.type == "file" else orig_msg.content[:120]
             reply_map[orig_msg.id] = ReplySnippet(
                 id=orig_msg.id,
                 sender_name=orig_name,
                 content=preview,
+                type=orig_msg.type,
+                filename=filename,
+                file_url=orig_msg.content if orig_msg.type == "file" else None,
+                is_image=is_image,
             )
 
     out: list[MessageResponse] = []

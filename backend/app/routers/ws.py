@@ -10,9 +10,30 @@ from app.database import get_db, SessionLocal
 from app.models.room_member import RoomMember
 from app.models.user import User
 from app.models.message import Message
+from app.models.document import Document
 from app.connection_manager import manager
 
 router = APIRouter(tags=["websocket"])
+_DOC_PREFIX = "/documents/"
+_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+
+
+def _file_id_from_message_content(content: str) -> str | None:
+    """Extracts document file ID from a /documents/<id> message content path."""
+    if not content.startswith(_DOC_PREFIX):
+        return None
+    rest = content[len(_DOC_PREFIX) :].split("?")[0].strip("/")
+    return rest or None
+
+
+def _is_image_filename(filename: str | None) -> bool:
+    """Determines if a filename should be rendered as an image preview."""
+    if not filename:
+        return False
+    dot = filename.rfind(".")
+    if dot == -1:
+        return False
+    return filename[dot:].lower() in _IMAGE_EXTENSIONS
 
 
 @router.websocket("/ws/{room_id}")
@@ -92,10 +113,26 @@ async def websocket_endpoint(
                         orig = msg_db.query(Message).filter(Message.id == reply_to_id).first()
                         if orig:
                             orig_user = msg_db.query(User).filter(User.id == orig.sender_id).first()
+                            filename = None
+                            is_image = False
+                            file_url = None
+                            if orig.type == "file":
+                                file_url = orig.content
+                                file_id = _file_id_from_message_content(orig.content)
+                                if file_id:
+                                    doc = msg_db.query(Document).filter(Document.file_id == file_id).first()
+                                    if doc:
+                                        filename = doc.original_filename
+                                is_image = _is_image_filename(filename)
+                            preview = (filename or "Attachment") if orig.type == "file" else orig.content[:120]
                             reply_snippet = {
                                 "id": orig.id,
                                 "sender_name": orig_user.name if orig_user else f"User {orig.sender_id}",
-                                "content": orig.content[:120],
+                                "content": preview,
+                                "type": orig.type,
+                                "filename": filename,
+                                "file_url": file_url,
+                                "is_image": is_image,
                             }
 
                     db_msg = Message(

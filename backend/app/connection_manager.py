@@ -17,7 +17,6 @@ class ConnectionManager:
 
     async def connect(self, room_id: int, user_id: int, websocket: WebSocket):
         """Accepts and stores a websocket connection for a user in a room."""
-        await websocket.accept()
         if room_id not in self.rooms:
             self.rooms[room_id] = {}
         if user_id not in self.rooms[room_id]:

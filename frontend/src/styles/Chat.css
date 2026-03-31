@@ -273,6 +273,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.reply-quote-image {
+  width: 120px;
+  height: 76px;
+  object-fit: cover;
+  border-radius: 4px;
+  margin-top: 2px;
+}
 
 /* ── Highlight animation when scrolling to a replied message ── */
 .msg-highlight {

@@ -12,6 +12,10 @@ class ReplySnippet(BaseModel):
     id: int
     sender_name: str
     content: str
+    type: str = "text"
+    filename: str | None = None
+    file_url: str | None = None
+    is_image: bool = False
 
 
 class MessageResponse(BaseModel):

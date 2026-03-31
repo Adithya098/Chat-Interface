@@ -28,11 +28,14 @@ Real-time room-based chat system built with FastAPI, WebSockets, React, and Post
 - **Room presence** (`online_users` count)
 - **Admin moderation**: delete messages with real-time deletion broadcast
 - **Custom toast + confirm UX** instead of native browser alerts/confirms
+- **Safer send UX**: message input is preserved and a toast is shown if websocket is not open
 
 ---
 
 #### File and Document Handling
 - **File uploads** (images, PDFs, docs)
+- **Upload guardrails**: hard `10 MB` max with frontend pre-check and backend enforcement
+- **Oversize feedback**: toast includes selected file size (for example, `12.7MB > 10MB`)
 - **Document center**: room-scoped document listing + secure open/download links
 - **Dual storage support**: Supabase Storage (signed URLs) with local-disk fallback
 
@@ -90,6 +93,9 @@ Real-time room-based chat system built with FastAPI, WebSockets, React, and Post
 
 ### Message and Moderation Improvements
 - Reply-to support with quoted preview and scroll-to-original behavior
+- File replies now render friendly previews:
+  - image replies show a thumbnail in the quote block
+  - non-image file replies show filename instead of raw `/documents/...` path
 - Admin message deletion with real-time removal broadcast (`message_deleted`)
 - Safer member removal flow with kick notice and room-wide update broadcast
 
@@ -229,7 +235,7 @@ cd backend && python -m uvicorn app.main:app --reload --no-access-log
 
 **Server → Client**
 ```json
-{ "type": "message",     "id": 1, "sender_id": 3, "sender_name": "Alice", "content": "hello", "created_at": "...", "reply_to": 42, "reply_snippet": { "id": 42, "sender_name": "Bob", "content": "Original message preview..." } }
+{ "type": "message",     "id": 1, "sender_id": 3, "sender_name": "Alice", "content": "hello", "created_at": "...", "reply_to": 42, "reply_snippet": { "id": 42, "sender_name": "Bob", "content": "photo.png", "type": "file", "filename": "photo.png", "file_url": "/documents/<file_id>", "is_image": true } }
 { "type": "typing",      "user_id": 3, "user_name": "Alice" }
 { "type": "stop_typing", "user_id": 3, "user_name": "Alice" }
 { "type": "file",        "id": 5, "sender_id": 3, "sender_name": "Alice", "file_url": "...", "filename": "..." }

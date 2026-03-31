@@ -16,6 +16,9 @@ import { showToast } from "../utils/toast";
 import { showConfirm } from "../utils/confirm";
 import "../styles/Chat.css";
 
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const MB_DIVISOR = 1024 * 1024;
+
 export default function ChatArea() {
   /* Renders active-room chat UI and coordinates realtime interaction handlers. */
   const { state, dispatch } = useChat();
@@ -95,7 +98,11 @@ export default function ChatArea() {
     if (replyingTo) {
       payload.reply_to = replyingTo.id;
     }
-    send(payload);
+    const sent = send(payload);
+    if (!sent) {
+      showToast("Message not sent. Reconnecting to chat...");
+      return;
+    }
     setText("");
     dispatch({ type: "CLEAR_REPLYING_TO" });
     if (isTypingRef.current) {
@@ -130,6 +137,13 @@ export default function ChatArea() {
     /* Uploads a selected file, shows it locally, and notifies the room via websocket. */
     const file = e.target.files[0];
     if (!file || !activeRoom) return;
+    if (file.size > MAX_UPLOAD_BYTES) {
+      const selectedSizeMb = (file.size / MB_DIVISOR).toFixed(1);
+      const limitMb = (MAX_UPLOAD_BYTES / MB_DIVISOR).toFixed(0);
+      showToast(`File size ${selectedSizeMb}MB is larger than ${limitMb}MB. Cannot send.`);
+      e.target.value = "";
+      return;
+    }
     try {
       const data = await uploadFile(activeRoom.id, user.id, file);
 
@@ -411,6 +425,14 @@ function MessageBubble({ msg, userId, isAdmin, canWrite, onDelete, onReply, onCl
               onClick={() => onClickReply(msg.reply_snippet.id)}
             >
               <span className="reply-quote-name">{msg.reply_snippet.sender_name}</span>
+              {msg.reply_snippet.is_image && msg.reply_snippet.file_url ? (
+                <img
+                  className="reply-quote-image"
+                  src={`${API_BASE}${msg.reply_snippet.file_url}?user_id=${userId}`}
+                  alt={msg.reply_snippet.filename || "Replied image"}
+                  loading="lazy"
+                />
+              ) : null}
               <span className="reply-quote-text">{msg.reply_snippet.content}</span>
             </div>
           )}
