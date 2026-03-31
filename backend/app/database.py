@@ -30,7 +30,7 @@ def _database_url():
         sslmode = os.getenv("DB_SSLMODE", "require")
         query = {"sslmode": sslmode} if sslmode else {}
         return URL.create(
-            "postgresql+psycopg2",
+            "postgresql+psycopg",
             username=user,
             password=password,
             host=host,
@@ -38,7 +38,14 @@ def _database_url():
             database=database,
             query=query,
         )
-    return os.getenv("DATABASE_URL", "postgresql://localhost:5432/chatdb")
+    raw_url = os.getenv("DATABASE_URL", "postgresql://localhost:5432/chatdb")
+    if raw_url.startswith("postgresql+psycopg://"):
+        return raw_url
+    if raw_url.startswith("postgresql://"):
+        return raw_url.replace("postgresql://", "postgresql+psycopg://", 1)
+    if raw_url.startswith("postgres://"):
+        return raw_url.replace("postgres://", "postgresql+psycopg://", 1)
+    return raw_url
 
 
 engine = create_engine(
