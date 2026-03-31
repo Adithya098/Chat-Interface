@@ -26,7 +26,7 @@ Real-time room-based chat system built with FastAPI, WebSockets, React, and Post
 #### Messaging and Realtime Collaboration
 - **Typing indicators** with 3-second graceful fade (real-time updates)
 - **Room presence** (`online_users` count)
-- **Admin moderation**: delete messages with real-time deletion broadcast
+- **Admin moderation**: soft-delete messages with real-time deletion broadcast
 - **Custom toast + confirm UX** instead of native browser alerts/confirms
 - **Safer send UX**: message input is preserved and a toast is shown if websocket is not open
 
@@ -96,7 +96,11 @@ Real-time room-based chat system built with FastAPI, WebSockets, React, and Post
 - File replies now render friendly previews:
   - image replies show a thumbnail in the quote block
   - non-image file replies show filename instead of raw `/documents/...` path
-- Admin message deletion with real-time removal broadcast (`message_deleted`)
+- Admin message deletion uses **soft delete**:
+  - deleted messages are hidden from normal room history
+  - replies keep `reply_to` references, so quoted reply preview still works after deletion
+  - clicking a quote whose original message is hidden/deleted shows **"Message not found"**
+- Real-time deletion broadcast (`message_deleted`) updates clients immediately
 - Safer member removal flow with kick notice and room-wide update broadcast
 
 ---
@@ -166,6 +170,13 @@ npm run dev:api      # backend only
 npm run dev:web      # frontend only
 ```
 
+Run one-time backend migration scripts (if needed after pulling new changes):
+
+```bash
+python backend/scripts/add_reply_to_column.py
+python backend/scripts/add_is_deleted_to_messages.py
+```
+
 - Open the URL Vite prints (default **http://localhost:3000**). In dev, HTTP requests are proxied and WebSocket connects to **127.0.0.1:8000**.
 - API docs: http://localhost:8000/docs
 
@@ -195,7 +206,7 @@ cd backend && python -m uvicorn app.main:app --reload --no-access-log
 | GET | `/rooms/{id}/members` | List all members |
 | GET | `/rooms/{id}/pending` | List pending join requests |
 | GET | `/rooms/{id}/messages/` | Message history |
-| DELETE | `/rooms/{id}/messages/{message_id}?admin_id={id}` | Admin deletes message |
+| DELETE | `/rooms/{id}/messages/{message_id}?admin_id={id}` | Admin soft-deletes message (hidden from history) |
 | POST | `/rooms/{id}/upload` | Upload file (creates message + document record) |
 | GET | `/rooms/{id}/documents?user_id={id}` | List room documents |
 | GET | `/documents/{file_id}?user_id={id}` | Open document (signed URL redirect or local file) |

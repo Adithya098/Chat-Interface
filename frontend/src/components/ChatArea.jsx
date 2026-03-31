@@ -215,7 +215,9 @@ export default function ChatArea() {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
       el.classList.add("msg-highlight");
       setTimeout(() => el.classList.remove("msg-highlight"), 1500);
+      return;
     }
+    showToast("Message not found");
   }, []);
 
   const handleLeaveRoom = useCallback(async () => {

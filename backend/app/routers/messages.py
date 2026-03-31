@@ -55,6 +55,7 @@ def get_messages(
         db.query(Message, User.name)
         .join(User, Message.sender_id == User.id)
         .filter(Message.room_id == room_id)
+        .filter(Message.is_deleted.is_(False))
         .order_by(Message.created_at.desc())
         .offset(offset)
         .limit(limit)
@@ -153,8 +154,11 @@ async def delete_message(
     ).first()
     if not msg:
         raise HTTPException(status_code=404, detail="Message not found")
+    if msg.is_deleted:
+        raise HTTPException(status_code=404, detail="Message not found")
 
-    db.delete(msg)
+    # Soft-delete to preserve reply snippets while hiding deleted messages from history.
+    msg.is_deleted = True
     db.commit()
 
     await manager.broadcast(room_id, {"type": "message_deleted", "message_id": message_id})
