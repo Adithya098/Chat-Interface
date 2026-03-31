@@ -2,7 +2,8 @@
  * HTTP utility helpers for backend API requests and file uploads.
  *
  * This file normalizes backend error payloads, enforces request timeouts, adds
- * default headers for JSON endpoints, and exposes convenience wrappers for
+ * default headers for JSON endpoints, automatically injects the JWT Bearer token
+ * from localStorage on every request, and exposes convenience wrappers for
  * generic API calls and multipart room file uploads.
  */
 import { API_BASE } from "../config.js";
@@ -46,18 +47,30 @@ async function fetchWithTimeout(url, opts = {}) {
   }
 }
 
+function getAuthHeaders() {
+  /* Reads the JWT from localStorage and returns an Authorization header object. */
+  const token = localStorage.getItem("chat_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export async function api(path, opts = {}) {
-  /* Performs a JSON API request and throws normalized errors on failure. */
+  /* Performs a JSON API request, injecting the JWT, and throws normalized errors on failure. */
   const method = (opts.method || "GET").toUpperCase();
-  const headers = { ...opts.headers };
+  const headers = { ...getAuthHeaders(), ...opts.headers };
   if (method !== "DELETE" && headers["Content-Type"] === undefined) {
     headers["Content-Type"] = "application/json";
   }
   const res = await fetchWithTimeout(`${BASE}${path}`, {
-    headers,
     ...opts,
+    headers,
   });
   if (!res.ok) {
+    if (res.status === 401) {
+      // Token expired or invalid — clear session and force re-login
+      localStorage.removeItem("chat_token");
+      localStorage.removeItem("chat_user");
+      window.location.reload();
+    }
     const err = await res.json().catch(() => ({}));
     const message = formatDetail(err.detail) || res.statusText;
     if (res.status === 503) {
@@ -73,17 +86,22 @@ export async function api(path, opts = {}) {
   return res.json();
 }
 
-export async function uploadFile(roomId, userId, file) {
-  /* Uploads a file to a room endpoint using multipart form data. */
+export async function uploadFile(roomId, file) {
+  /* Uploads a file to a room endpoint using multipart form data with JWT auth. */
   const form = new FormData();
-  form.append("user_id", userId);
   form.append("file", file);
 
   const res = await fetchWithTimeout(`${BASE}/rooms/${roomId}/upload`, {
     method: "POST",
+    headers: getAuthHeaders(),
     body: form,
   });
   if (!res.ok) {
+    if (res.status === 401) {
+      localStorage.removeItem("chat_token");
+      localStorage.removeItem("chat_user");
+      window.location.reload();
+    }
     const err = await res.json().catch(() => ({}));
     throw new Error(formatDetail(err.detail) || "Upload failed");
   }

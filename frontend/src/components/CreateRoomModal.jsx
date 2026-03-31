@@ -27,9 +27,10 @@ export default function CreateRoomModal({ onClose, onCreated }) {
     setError("");
     setLoading(true);
     try {
+      // created_by is resolved from the JWT on the backend — not sent in body
       await api("/rooms/", {
         method: "POST",
-        body: JSON.stringify({ name: name.trim(), created_by: state.user.id }),
+        body: JSON.stringify({ name: name.trim() }),
       });
       onCreated();
     } catch (err) {

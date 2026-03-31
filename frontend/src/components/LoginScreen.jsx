@@ -2,8 +2,8 @@
  * Authentication screen that handles login and account creation workflows.
  *
  * This component toggles between login and signup forms, validates required
- * fields, calls backend auth endpoints, surfaces errors, and stores the
- * authenticated user in global chat context on success.
+ * fields, calls backend auth endpoints, and stores the JWT token and user
+ * profile in global chat context on success.
  */
 import { useState } from "react";
 import { useChat } from "../context/ChatContext";
@@ -32,7 +32,7 @@ export default function LoginScreen() {
   };
 
   const handleLogin = async (e) => {
-    /* Submits login credentials and stores the returned user on success. */
+    /* Submits login credentials, stores returned JWT and user profile on success. */
     e.preventDefault();
     setError("");
     if (!email.trim() || !password) {
@@ -42,11 +42,12 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      const user = await api("/users/login", {
+      const data = await api("/users/login", {
         method: "POST",
         body: JSON.stringify({ email: email.trim(), password }),
       });
-      dispatch({ type: "SET_USER", payload: user });
+      // data = { token: "...", user: { id, name, ... } }
+      dispatch({ type: "SET_USER", payload: { user: data.user, token: data.token } });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -55,7 +56,7 @@ export default function LoginScreen() {
   };
 
   const handleSignup = async (e) => {
-    /* Submits account registration data and signs in the new user. */
+    /* Submits account registration data, stores returned JWT and user profile on success. */
     e.preventDefault();
     setError("");
     if (!name.trim() || !email.trim() || !password || !mobile.trim()) {
@@ -69,7 +70,7 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      const user = await api("/users/signup", {
+      const data = await api("/users/signup", {
         method: "POST",
         body: JSON.stringify({
           name: name.trim(),
@@ -78,7 +79,7 @@ export default function LoginScreen() {
           mobile: mobile.trim(),
         }),
       });
-      dispatch({ type: "SET_USER", payload: user });
+      dispatch({ type: "SET_USER", payload: { user: data.user, token: data.token } });
     } catch (err) {
       setError(err.message);
     } finally {

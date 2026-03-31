@@ -1,10 +1,13 @@
 """Room membership workflow endpoints for join and moderation lifecycle.
 
-This module validates room/admin access, creates join requests, 
-approves or rejects pending members, promotes members to admin, removes or disconnects members, 
-supports voluntary leave, and returns member/pending lists for moderation UIs."""
+This module validates room/admin access, creates join requests,
+approves or rejects pending members, promotes members to admin, removes or disconnects members,
+supports voluntary leave, and returns member/pending lists for moderation UIs.
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+Acting user identity is always resolved from the JWT — admin_id and self-action user_id
+are no longer accepted as client-supplied parameters."""
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.connection_manager import manager
@@ -12,6 +15,7 @@ from app.models.user import User
 from app.models.room import Room
 from app.models.room_member import RoomMember
 from app.schemas.room_member import JoinRequest, ApproveRejectRequest, RoomMemberResponse
+from app.auth import get_current_user
 
 router = APIRouter(prefix="/rooms/{room_id}", tags=["members"])
 
@@ -38,29 +42,27 @@ def _get_admin_or_403(room_id: int, admin_id: int, db: Session) -> RoomMember:
 
 
 @router.post("/join", response_model=RoomMemberResponse, status_code=201)
-def join_room(room_id: int, req: JoinRequest, db: Session = Depends(get_db)):
-    """Creates a pending membership request for a user to join a room with a chosen role."""
+def join_room(
+    room_id: int,
+    req: JoinRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Creates a pending membership request for the authenticated user with a chosen role."""
     _get_room_or_404(room_id, db)
 
-    # Check user exists
-    user = db.query(User).filter(User.id == req.user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    # Check if already a member
     existing = db.query(RoomMember).filter(
         RoomMember.room_id == room_id,
-        RoomMember.user_id == req.user_id,
+        RoomMember.user_id == current_user.id,
     ).first()
     if existing:
         raise HTTPException(status_code=400, detail="Already a member or pending request exists")
 
-    # Validate role
-    if req.role not in ("read", "write", "admin"):
-        raise HTTPException(status_code=400, detail="Role must be 'read', 'write', or 'admin'")
+    if req.role not in ("read", "write"):
+        raise HTTPException(status_code=400, detail="Role must be 'read' or 'write'")
 
     member = RoomMember(
-        user_id=req.user_id,
+        user_id=current_user.id,
         room_id=room_id,
         role=req.role,
         status="pending",
@@ -72,10 +74,15 @@ def join_room(room_id: int, req: JoinRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/approve", response_model=RoomMemberResponse)
-def approve_member(room_id: int, req: ApproveRejectRequest, db: Session = Depends(get_db)):
-    """Approves a pending room membership request as an admin action."""
+def approve_member(
+    room_id: int,
+    req: ApproveRejectRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Approves a pending room membership request — caller must be an approved admin."""
     _get_room_or_404(room_id, db)
-    _get_admin_or_403(room_id, req.admin_id, db)
+    _get_admin_or_403(room_id, current_user.id, db)
 
     member = db.query(RoomMember).filter(
         RoomMember.room_id == room_id,
@@ -92,10 +99,15 @@ def approve_member(room_id: int, req: ApproveRejectRequest, db: Session = Depend
 
 
 @router.post("/reject", response_model=RoomMemberResponse)
-def reject_member(room_id: int, req: ApproveRejectRequest, db: Session = Depends(get_db)):
-    """Rejects a pending room membership request as an admin action."""
+def reject_member(
+    room_id: int,
+    req: ApproveRejectRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Rejects a pending room membership request — caller must be an approved admin."""
     _get_room_or_404(room_id, db)
-    _get_admin_or_403(room_id, req.admin_id, db)
+    _get_admin_or_403(room_id, current_user.id, db)
 
     member = db.query(RoomMember).filter(
         RoomMember.room_id == room_id,
@@ -115,14 +127,14 @@ def reject_member(room_id: int, req: ApproveRejectRequest, db: Session = Depends
 async def remove_member(
     room_id: int,
     user_id: int,
-    admin_id: int = Query(...),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """Removes a member from a room, disconnects them, and notifies active participants."""
+    """Removes a member from a room — caller must be an approved admin."""
     _get_room_or_404(room_id, db)
-    _get_admin_or_403(room_id, admin_id, db)
+    _get_admin_or_403(room_id, current_user.id, db)
 
-    if admin_id == user_id:
+    if current_user.id == user_id:
         raise HTTPException(status_code=400, detail="Admins cannot remove themselves")
 
     member = db.query(RoomMember).filter(
@@ -132,7 +144,6 @@ async def remove_member(
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
 
-    # Prevent removing admin if they're the last admin
     if member.role == "admin":
         admin_count = db.query(RoomMember).filter(
             RoomMember.room_id == room_id,
@@ -142,11 +153,9 @@ async def remove_member(
         if admin_count <= 1:
             raise HTTPException(status_code=400, detail="Cannot remove the last admin")
 
-    # Fetch room and admin names for the notification message
     room = db.query(Room).filter(Room.id == room_id).first()
-    admin_user = db.query(User).filter(User.id == admin_id).first()
     room_name = room.name if room else f"room {room_id}"
-    admin_name = admin_user.name if admin_user else f"Admin {admin_id}"
+    admin_name = current_user.name
 
     db.delete(member)
     db.commit()
@@ -162,17 +171,26 @@ async def remove_member(
 
 
 @router.get("/members", response_model=list[RoomMemberResponse])
-def list_members(room_id: int, db: Session = Depends(get_db)):
-    """Lists all membership records for a room across pending and approved statuses."""
+def list_members(
+    room_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Lists all membership records for a room — requires a valid JWT."""
     _get_room_or_404(room_id, db)
     return db.query(RoomMember).filter(RoomMember.room_id == room_id).all()
 
 
 @router.post("/promote")
-async def promote_member(room_id: int, req: ApproveRejectRequest, db: Session = Depends(get_db)):
-    """Promotes an approved room member to admin after validating requester privileges."""
+async def promote_member(
+    room_id: int,
+    req: ApproveRejectRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Promotes an approved room member to admin — caller must be an approved admin."""
     _get_room_or_404(room_id, db)
-    _get_admin_or_403(room_id, req.admin_id, db)
+    _get_admin_or_403(room_id, current_user.id, db)
 
     member = db.query(RoomMember).filter(
         RoomMember.room_id == room_id,
@@ -188,33 +206,25 @@ async def promote_member(room_id: int, req: ApproveRejectRequest, db: Session = 
     member.role = "admin"
     db.commit()
     db.refresh(member)
-
-    # Promoted to admin notification (disabled)
-    # await manager.broadcast(room_id, {
-    #     "type": "system",
-    #     "content": f"User {req.user_id} was promoted to admin",
-    # })
-
     return member
 
 
 @router.post("/leave")
 async def leave_room(
     room_id: int,
-    user_id: int = Query(...),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """Removes the requesting user from a room while protecting against last-admin exit."""
+    """Removes the authenticated user from a room while protecting against last-admin exit."""
     _get_room_or_404(room_id, db)
 
     member = db.query(RoomMember).filter(
         RoomMember.room_id == room_id,
-        RoomMember.user_id == user_id,
+        RoomMember.user_id == current_user.id,
     ).first()
     if not member:
         raise HTTPException(status_code=404, detail="Not a member of this room")
 
-    # Prevent the last admin from leaving
     if member.role == "admin":
         admin_count = db.query(RoomMember).filter(
             RoomMember.room_id == room_id,
@@ -227,18 +237,22 @@ async def leave_room(
     db.delete(member)
     db.commit()
 
-    await manager.kick_user(room_id, user_id, reason="You left the room")
+    await manager.kick_user(room_id, current_user.id, reason="You left the room")
     await manager.broadcast(room_id, {
         "type": "system",
-        "content": f"User {user_id} left the room",
+        "content": f"User {current_user.id} left the room",
     })
 
     return {"detail": "Left room successfully"}
 
 
 @router.get("/pending", response_model=list[RoomMemberResponse])
-def list_pending(room_id: int, db: Session = Depends(get_db)):
-    """Lists pending join requests for a room to support admin moderation views."""
+def list_pending(
+    room_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Lists pending join requests for a room — requires a valid JWT."""
     _get_room_or_404(room_id, db)
     return db.query(RoomMember).filter(
         RoomMember.room_id == room_id,

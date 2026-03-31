@@ -1,15 +1,17 @@
 """User account endpoints for registration, authentication, and lookup operations.
 
-This module hashes and verifies passwords with bcrypt, 
-validates uniqueness constraints at signup, authenticates login attempts, 
-and exposes user listing/detail routes used by internal room/member UI flows."""
+This module hashes and verifies passwords with bcrypt,
+validates uniqueness constraints at signup, authenticates login attempts,
+issues JWT tokens on success, and exposes user listing/detail routes
+protected by token verification."""
 
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
-from app.schemas.user import UserSignup, UserLogin, UserResponse
+from app.schemas.user import UserSignup, UserLogin, UserResponse, AuthResponse
+from app.auth import create_access_token, get_current_user
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -24,9 +26,9 @@ def _verify_password(password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
 
 
-@router.post("/signup", response_model=UserResponse, status_code=201)
+@router.post("/signup", response_model=AuthResponse, status_code=201)
 def signup(req: UserSignup, db: Session = Depends(get_db)):
-    """Registers a new user account after email uniqueness and input normalization checks."""
+    """Registers a new user account and returns a JWT alongside the user profile."""
     normalized_email = str(req.email).strip().lower()
 
     existing = db.query(User).filter(User.email == normalized_email).first()
@@ -42,12 +44,14 @@ def signup(req: UserSignup, db: Session = Depends(get_db)):
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    return db_user
+
+    token = create_access_token(db_user.id)
+    return AuthResponse(token=token, user=UserResponse.model_validate(db_user))
 
 
-@router.post("/login", response_model=UserResponse)
+@router.post("/login", response_model=AuthResponse)
 def login(req: UserLogin, db: Session = Depends(get_db)):
-    """Authenticates a user by email and password and returns the matching account."""
+    """Authenticates a user by email and password and returns a JWT alongside the profile."""
     normalized_email = str(req.email).strip().lower()
 
     user = db.query(User).filter(User.email == normalized_email).first()
@@ -60,19 +64,26 @@ def login(req: UserLogin, db: Session = Depends(get_db)):
     if not _verify_password(req.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    return user
+    token = create_access_token(user.id)
+    return AuthResponse(token=token, user=UserResponse.model_validate(user))
 
 
-# Keep these for internal use (members panel name resolution, etc.)
 @router.get("/", response_model=list[UserResponse])
-def get_users(db: Session = Depends(get_db)):
-    """Returns all user records for internal and administrative consumption."""
+def get_users(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Returns all user records — requires a valid JWT."""
     return db.query(User).all()
 
 
 @router.get("/{user_id}", response_model=UserResponse)
-def get_user(user_id: int, db: Session = Depends(get_db)):
-    """Returns a single user by ID or raises not found when absent."""
+def get_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Returns a single user by ID — requires a valid JWT."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

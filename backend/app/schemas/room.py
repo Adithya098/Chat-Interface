@@ -7,9 +7,8 @@ from datetime import datetime
 
 
 class RoomCreate(BaseModel):
-    """Request payload for creating a room and specifying its creator user ID."""
+    """Request payload for creating a room — creator is resolved from the JWT."""
     name: str
-    created_by: int
 
 
 class RoomResponse(BaseModel):

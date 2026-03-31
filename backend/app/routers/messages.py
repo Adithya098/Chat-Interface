@@ -1,8 +1,11 @@
 """Message retrieval and moderation endpoints for room conversations.
 
-This module returns paginated message history with sender names, 
-resolves file metadata for file-type messages, enriches replies with compact original-message snippets, 
-and allows admins to delete messages while broadcasting realtime deletion events."""
+This module returns paginated message history with sender names,
+resolves file metadata for file-type messages, enriches replies with compact original-message snippets,
+and allows admins to delete messages while broadcasting realtime deletion events.
+
+All endpoints require a valid JWT. The admin identity for delete is extracted
+from the token — admin_id is no longer a client-supplied query parameter."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -14,6 +17,7 @@ from app.models.room import Room
 from app.models.room_member import RoomMember
 from app.models.user import User
 from app.schemas.message import MessageResponse, ReplySnippet
+from app.auth import get_current_user
 
 router = APIRouter(prefix="/rooms/{room_id}/messages", tags=["messages"])
 
@@ -25,7 +29,7 @@ def _file_id_from_message_content(content: str) -> str | None:
     """Extracts the document file ID from a message content path when the prefix matches."""
     if not content.startswith(_DOC_PREFIX):
         return None
-    rest = content[len(_DOC_PREFIX) :].split("?")[0].strip("/")
+    rest = content[len(_DOC_PREFIX):].split("?")[0].strip("/")
     return rest or None
 
 
@@ -45,8 +49,9 @@ def get_messages(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """Returns paginated room messages with sender names, file metadata, and reply snippets."""
+    """Returns paginated room messages — caller must be an authenticated user."""
     room = db.query(Room).filter(Room.id == room_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
@@ -73,7 +78,6 @@ def get_messages(
         for doc in db.query(Document).filter(Document.file_id.in_(file_ids)).all():
             filenames[doc.file_id] = doc.original_filename
 
-    # Resolve reply snippets: gather all reply_to IDs, fetch originals in one query
     reply_ids = [msg.reply_to for msg, _ in rows_chrono if msg.reply_to is not None]
     reply_map: dict[int, ReplySnippet] = {}
     if reply_ids:
@@ -83,6 +87,7 @@ def get_messages(
             db.query(Message, OrigUser.name)
             .join(OrigUser, Message.sender_id == OrigUser.id)
             .filter(Message.id.in_(reply_ids))
+            .filter(Message.room_id == room_id)
             .all()
         )
         reply_file_ids = [
@@ -134,14 +139,13 @@ def get_messages(
 async def delete_message(
     room_id: int,
     message_id: int,
-    admin_id: int = Query(...),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """Deletes a room message when requested by an approved admin and broadcasts removal."""
-    # Verify admin
+    """Soft-deletes a room message — caller must be an approved admin of this room."""
     admin = db.query(RoomMember).filter(
         RoomMember.room_id == room_id,
-        RoomMember.user_id == admin_id,
+        RoomMember.user_id == current_user.id,
         RoomMember.role == "admin",
         RoomMember.status == "approved",
     ).first()
@@ -152,12 +156,9 @@ async def delete_message(
         Message.id == message_id,
         Message.room_id == room_id,
     ).first()
-    if not msg:
-        raise HTTPException(status_code=404, detail="Message not found")
-    if msg.is_deleted:
+    if not msg or msg.is_deleted:
         raise HTTPException(status_code=404, detail="Message not found")
 
-    # Soft-delete to preserve reply snippets while hiding deleted messages from history.
     msg.is_deleted = True
     db.commit()
 

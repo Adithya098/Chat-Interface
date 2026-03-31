@@ -4,121 +4,59 @@ Real-time room-based chat system built with FastAPI, WebSockets, React, and Post
 
 ## Features
 
-### Implemented Features
-
-#### Authentication and User Session
-- **Authentication**: Secure signup/login with bcrypt password hashing, mobile number field
-- **Session persistence**: signed-in user is restored from local storage
+### Authentication and User Session
+- **JWT authentication**: login and signup return a signed JWT (`Authorization: Bearer <token>`) used on every subsequent request
+- **Session persistence**: token and user profile are restored from `localStorage` on page reload; expired tokens force re-login automatically
+- **Password security**: bcrypt hashing with salted hash — plaintext passwords are never stored
 - **Input validation**: required fields and password minimum checks on signup
 
 ---
 
-#### Room Access and Membership
+### Room Access and Membership
 - **Role-based room access** (`admin` / `write` / `read`)
-- **Join requests** with admin approve/reject flow (request any role: read, write, or admin)
-- **Admin request inbox** with grouped pending requests and badges
-- **Member management**: promote members, remove members, and prevent last-admin removal
-- **Real-time messaging** over WebSocket with message replies (quoted preview + scroll-to-original)
-- **Room management**: users can leave voluntarily, last admin protection
+- **Join requests** with admin approve/reject flow — users may request `read` or `write` roles only (admin role is assigned by promotion, not self-request)
+- **Admin request inbox** with grouped pending requests and role badges
+- **Member management**: promote members to admin, remove members, prevent last-admin removal
+- **Room management**: users can leave voluntarily; last-admin protection prevents orphaned rooms
 
 ---
 
-#### Messaging and Realtime Collaboration
-- **Typing indicators** with 3-second graceful fade (real-time updates)
+### Messaging and Realtime Collaboration
+- **Real-time messaging** over WebSocket with JWT-authenticated connections (`?token=` query param)
+- **Message replies** with quoted preview and scroll-to-original
+- **Typing indicators** with 3-second graceful fade
 - **Room presence** (`online_users` count)
 - **Admin moderation**: soft-delete messages with real-time deletion broadcast
-- **Custom toast + confirm UX** instead of native browser alerts/confirms
-- **Safer send UX**: message input is preserved and a toast is shown if websocket is not open
+- **Custom toast + confirm UX** instead of native browser alerts
+- **Safer send UX**: message input is preserved and a toast is shown if the WebSocket is not open
 
 ---
 
-#### File and Document Handling
-- **File uploads** (images, PDFs, docs)
-- **Upload guardrails**: hard `10 MB` max with frontend pre-check and backend enforcement
-- **Oversize feedback**: toast includes selected file size (for example, `12.7MB > 10MB`)
-- **Document center**: room-scoped document listing + secure open/download links
-- **Dual storage support**: Supabase Storage (signed URLs) with local-disk fallback
+### File and Document Handling
+- **File uploads** (images, audio, video, PDFs, docs, archives)
+- **Upload guardrails**: 10 MB max with frontend pre-check and backend enforcement
+- **Media rendering**: images expand inline; audio and video have native player controls
+- **Document center**: room-scoped document listing with secure open/download links
+- **Dual storage**: Supabase Storage (signed URLs) with local-disk fallback
+- **Authenticated media**: `<img>`, `<audio>`, `<video>` tags load media via `?token=` query param since browser tags cannot send `Authorization` headers
 
 ---
 
-#### API and Data Flow
-- **Message history** via REST API (sender names, reply snippets, file metadata)
-- **Role-aware authorization** enforced on REST and WebSocket endpoints
-- **Auto-refresh UX**: room/member/admin-request state refresh on focus, visibility change, and intervals
-
-
----
-
-
-
-### Enhanced Authentication
-- Replaced old auto-create user flow with separate **Signup** and **Login** flows
-- Signup now requires `name`, `email`, `mobile`, and `password`
-- Login now uses `email` + `password` only
-- Passwords are securely hashed with **bcrypt** before storing
-- Added startup auto-migration for `users.password_hash` and `users.mobile` columns
-
----
-
-### Leave Room
-- Users can voluntarily leave any room they're a member of
-- Non-destructive: can rejoin later if invited
-- Safety: last admin cannot leave (prevents orphaned rooms)
-- Button location: Room header (top-right, red button)
-
----
-
-### Admin Promotion
-- Room admins can promote existing non-admin members to admin role
-- Requires confirmation dialog
-- New admin gains full room management permissions
-- Broadcast notification sent to room
-
----
-
-### Join Request Roles
-- Users can now request to join as any role: `read`, `write`, or `admin`
-- Admin role requests require admin approval (same as other roles)
-- Clear labeling in join modal (admin option highlighted in orange)
-- Admins approve/reject in Members panel
-
----
-
-### Admin Join Request Inbox
-- Admins see pending join requests grouped by room in a dedicated modal
-- Sidebar shows total pending request count plus per-room pending badges
-- New incoming requests can auto-open moderation modal for faster approvals
-
----
-
-### Message and Moderation Improvements
-- Reply-to support with quoted preview and scroll-to-original behavior
-- File replies now render friendly previews:
-  - image replies show a thumbnail in the quote block
-  - non-image file replies show filename instead of raw `/documents/...` path
-- Admin message deletion uses **soft delete**:
-  - deleted messages are hidden from normal room history
-  - replies keep `reply_to` references, so quoted reply preview still works after deletion
-  - clicking a quote whose original message is hidden/deleted shows **"Message not found"**
-- Real-time deletion broadcast (`message_deleted`) updates clients immediately
-- Safer member removal flow with kick notice and room-wide update broadcast
-
----
-
-### File and Document Flow
-- Upload creates both a `Document` record and a corresponding chat file message
-- Room members can list room documents via REST and open by stable `file_id`
-- Storage backend supports Supabase signed URLs with local-disk fallback
+### Security
+- All API endpoints (except `/users/login`, `/users/signup`, `/health`, `/db_health`) require a valid JWT
+- Acting identity (`user_id`, `admin_id`) is always resolved from the token — never trusted from client-supplied parameters
+- WebSocket connections are authenticated via `?token=` before any messages are accepted
+- 401 responses automatically clear the local session and redirect to login
 
 ---
 
 ## Role Permissions
 
-| Role | Read | Send | Reply | Upload | Approve/Reject Requests | Delete Messages | Remove Members | Promote Members | Leave Room |
-|------|------|------|-------|--------|------------------------|-----------------|----------------|-----------------|------------|
+| Role | Read | Send | Reply | Upload | Approve/Reject | Delete Messages | Remove Members | Promote Members | Leave Room |
+|------|------|------|-------|--------|---------------|-----------------|----------------|-----------------|------------|
 | `admin` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (if not last admin) | ✓ | ✓ (if not last admin) |
 | `write` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ |
-| `read` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
+| `read`  | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
 
 ---
 
@@ -130,6 +68,7 @@ Real-time room-based chat system built with FastAPI, WebSockets, React, and Post
 - **Supabase Storage (optional)** — document/file storage with signed URLs
 - **React + Vite** — frontend client
 - **bcrypt** — password hashing
+- **python-jose** — JWT signing and verification (HS256)
 - **Render** — hosting
 
 ---
@@ -139,11 +78,23 @@ Real-time room-based chat system built with FastAPI, WebSockets, React, and Post
 ```
 Chat-Interface/               # repo root (.env, package.json, runtime.txt)
 ├── backend/
-│   ├── app/                  # FastAPI package (main, database, models, schemas, routers)
-│   ├── scripts/              # e.g. seed_dummy_data
+│   ├── app/
+│   │   ├── auth.py           # JWT token creation + verification dependencies
+│   │   ├── main.py
+│   │   ├── database.py
+│   │   ├── connection_manager.py
+│   │   ├── supabase_storage.py
+│   │   ├── models/           # SQLAlchemy models (user, room, message, room_member, document)
+│   │   ├── routers/          # API + WebSocket route handlers
+│   │   └── schemas/          # Pydantic request/response schemas
+│   ├── scripts/              # Migration + seed utilities
 │   ├── uploads/              # Local file storage (non-Supabase)
 │   └── requirements.txt
 └── frontend/                 # React + Vite
+    └── src/
+        ├── context/          # ChatContext (user session + JWT state)
+        ├── hooks/            # useApi (auto-injects Bearer token), useWebSocket
+        └── components/       # UI components
 ```
 
 ---
@@ -154,8 +105,9 @@ Chat-Interface/               # repo root (.env, package.json, runtime.txt)
 pip install -r backend/requirements.txt
 npm install               # root: installs concurrently for `npm run dev`
 cd frontend && npm install && cd ..
-cp .env.example .env      # if present; otherwise create .env at repo root (see below)
 ```
+
+Create a `.env` file at the repo root (see **Environment Variables** below).
 
 **Development (API + Vite together):**
 
@@ -163,22 +115,22 @@ cp .env.example .env      # if present; otherwise create .env at repo root (see 
 npm run dev
 ```
 
-Additional local scripts:
+Additional scripts:
 
 ```bash
 npm run dev:api      # backend only
 npm run dev:web      # frontend only
 ```
 
-Run one-time backend migration scripts (if needed after pulling new changes):
+Run one-time database migration scripts if needed after pulling new changes:
 
 ```bash
 python backend/scripts/add_reply_to_column.py
 python backend/scripts/add_is_deleted_to_messages.py
 ```
 
-- Open the URL Vite prints (default **http://localhost:3000**). In dev, HTTP requests are proxied and WebSocket connects to **127.0.0.1:8000**.
-- API docs: http://localhost:8000/docs
+- Frontend: **http://localhost:3000** (Vite; HTTP requests are proxied, WebSocket connects to `127.0.0.1:8000`)
+- API docs: **http://localhost:8000/docs**
 
 **Backend only** (serves built `frontend/dist` if present):
 
@@ -188,49 +140,82 @@ cd backend && python -m uvicorn app.main:app --reload --no-access-log
 
 ---
 
+## Environment Variables
+
+Create a `.env` file at the repo root:
+
+```env
+# JWT — change this to a long random string before deploying
+JWT_SECRET_KEY=change-this-to-a-long-random-secret-before-deploying
+
+# PostgreSQL (direct connection)
+DB_USER=
+DB_PASSWORD=
+DB_HOST=
+DB_PORT=6543
+DB_NAME=postgres
+DB_SSLMODE=require
+
+# Supabase Storage (optional — omit to use local disk fallback)
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+SUPABASE_STORAGE_BUCKET=
+SUPABASE_STORAGE_PUBLIC_URLS=true
+```
+
+> `JWT_SECRET_KEY` must be set to a strong random value in production. The default in `auth.py` is a placeholder that will reject tokens signed with a different key after a redeploy.
+
+---
+
 ## API Overview
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/users/signup` | Register a new user (name, email, mobile, password) |
-| POST | `/users/login` | Authenticate existing user (email, password) |
-| GET | `/users/` | List users |
-| GET | `/users/{user_id}` | Get user by ID |
-| POST | `/rooms/` | Create room |
-| POST | `/rooms/{id}/join` | Request to join (role: read, write, or admin) |
-| POST | `/rooms/{id}/approve` | Admin approves member request |
-| POST | `/rooms/{id}/reject` | Admin rejects member request |
-| POST | `/rooms/{id}/promote` | Admin promotes member to admin |
-| POST | `/rooms/{id}/leave` | User leaves room |
-| DELETE | `/rooms/{id}/members/{user_id}?admin_id={id}` | Admin removes member |
-| GET | `/rooms/{id}/members` | List all members |
-| GET | `/rooms/{id}/pending` | List pending join requests |
-| GET | `/rooms/{id}/messages/` | Message history |
-| DELETE | `/rooms/{id}/messages/{message_id}?admin_id={id}` | Admin soft-deletes message (hidden from history) |
-| POST | `/rooms/{id}/upload` | Upload file (creates message + document record) |
-| GET | `/rooms/{id}/documents?user_id={id}` | List room documents |
-| GET | `/documents/{file_id}?user_id={id}` | Open document (signed URL redirect or local file) |
-| GET | `/files/{filename}` | Legacy local file endpoint |
-| WS | `/ws/{room_id}?user_id=` | WebSocket (messages, typing, presence) |
+All endpoints except `/users/login`, `/users/signup`, `/health`, and `/db_health` require:
+
+```
+Authorization: Bearer <token>
+```
+
+The token is returned by `/users/login` and `/users/signup`.
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/users/signup` | — | Register (returns `{ token, user }`) |
+| POST | `/users/login` | — | Authenticate (returns `{ token, user }`) |
+| GET | `/users/` | Bearer | List users |
+| GET | `/users/{user_id}` | Bearer | Get user by ID |
+| POST | `/rooms/` | Bearer | Create room (creator from token) |
+| GET | `/rooms/` | Bearer | List all rooms |
+| GET | `/rooms/{id}` | Bearer | Get room by ID |
+| POST | `/rooms/{id}/join` | Bearer | Request to join with role (`read` or `write`) |
+| POST | `/rooms/{id}/approve` | Bearer (admin) | Approve a pending member |
+| POST | `/rooms/{id}/reject` | Bearer (admin) | Reject a pending member |
+| POST | `/rooms/{id}/promote` | Bearer (admin) | Promote member to admin |
+| POST | `/rooms/{id}/leave` | Bearer | Leave room (user from token) |
+| DELETE | `/rooms/{id}/members/{user_id}` | Bearer (admin) | Remove a member |
+| GET | `/rooms/{id}/members` | Bearer | List all members |
+| GET | `/rooms/{id}/pending` | Bearer | List pending join requests |
+| GET | `/rooms/{id}/messages/` | Bearer | Paginated message history |
+| DELETE | `/rooms/{id}/messages/{message_id}` | Bearer (admin) | Soft-delete a message |
+| POST | `/rooms/{id}/upload` | Bearer | Upload file (creates message + document record) |
+| GET | `/rooms/{id}/documents` | Bearer | List room documents |
+| GET | `/documents/{file_id}` | Bearer or `?token=` | Open document (signed URL redirect or local stream) |
+| GET | `/files/{filename}` | Bearer | Legacy local file endpoint |
+| WS | `/ws/{room_id}?token=` | `?token=` JWT | WebSocket (messages, typing, presence) |
+
+> `/documents/{file_id}` accepts both `Authorization: Bearer` and `?token=` query param. The `?token=` fallback is required because browser `<img>`, `<audio>`, and `<video>` tags cannot attach custom headers.
 
 ---
 
-## Authentication Notes
+## Authentication Flow
 
-- Passwords are hashed with `bcrypt` (salted hash) and never stored as plaintext
-- Email is normalized before lookup/creation to prevent duplicate variants
-- Login returns `401` for invalid credentials
-- Signup returns `400` when email is already registered
-
----
-
-## File Storage Notes
-
-- Upload limits: allowed extensions are enforced and max size is `10 MB`
-- Primary backend: Supabase Storage when `SUPABASE_URL` + service key + bucket are configured
-- Fallback backend: local `backend/uploads` storage when Supabase is unavailable
-- Document opens use signed URLs for protected Supabase objects
-- Optional public URL mode is supported via `SUPABASE_STORAGE_PUBLIC_URLS`
+```
+1. POST /users/login  →  { token: "eyJ...", user: { id, name, ... } }
+2. Store token in localStorage
+3. All REST calls:  Authorization: Bearer <token>
+4. WebSocket:       ws://.../ws/{room_id}?token=<token>
+5. Media URLs:      /documents/{file_id}?token=<token>
+6. Token expires after 7 days → 401 response → auto-logout + redirect to login
+```
 
 ---
 
@@ -241,20 +226,28 @@ cd backend && python -m uvicorn app.main:app --reload --no-access-log
 { "type": "message",     "content": "hello", "reply_to": 42 }
 { "type": "typing" }
 { "type": "stop_typing" }
-{ "type": "file",        "message_id": 5, "file_url": "/documents/<file_id>", "filename": "photo.png" }
+{ "type": "file", "message_id": 5, "file_url": "/documents/<file_id>", "filename": "photo.png" }
 ```
 
 **Server → Client**
 ```json
-{ "type": "message",     "id": 1, "sender_id": 3, "sender_name": "Alice", "content": "hello", "created_at": "...", "reply_to": 42, "reply_snippet": { "id": 42, "sender_name": "Bob", "content": "photo.png", "type": "file", "filename": "photo.png", "file_url": "/documents/<file_id>", "is_image": true } }
-{ "type": "typing",      "user_id": 3, "user_name": "Alice" }
-{ "type": "stop_typing", "user_id": 3, "user_name": "Alice" }
-{ "type": "file",        "id": 5, "sender_id": 3, "sender_name": "Alice", "file_url": "...", "filename": "..." }
-{ "type": "system",      "content": "User 3 joined the room" }
-{ "type": "online_users","users": [1, 2, 3] }
-{ "type": "error",       "content": "You don't have write permission in this room" }
+{ "type": "message",      "id": 1, "sender_id": 3, "sender_name": "Alice", "content": "hello", "created_at": "...", "reply_to": 42, "reply_snippet": { ... } }
+{ "type": "typing",       "user_id": 3, "user_name": "Alice" }
+{ "type": "stop_typing",  "user_id": 3, "user_name": "Alice" }
+{ "type": "file",         "id": 5, "sender_id": 3, "sender_name": "Alice", "file_url": "...", "filename": "..." }
+{ "type": "online_users", "users": [1, 2, 3] }
+{ "type": "error",        "content": "You don't have write permission in this room" }
 { "type": "message_deleted", "message_id": 100 }
 { "type": "member_removed",  "user_id": 5 }
-{ "type": "kicked",          "content": "You have been removed from this room" }
+{ "type": "kicked",          "content": "You were removed from 'general' by Alice" }
 ```
 
+---
+
+## File Storage
+
+- Allowed extensions: images, audio, video, PDF, txt, doc/docx, csv, zip
+- Max size: **10 MB** (enforced frontend and backend)
+- Primary: Supabase Storage — files served via time-limited signed URLs (default 1 hour)
+- Fallback: local `backend/uploads/` directory
+- File access is always membership-checked — non-members cannot open documents

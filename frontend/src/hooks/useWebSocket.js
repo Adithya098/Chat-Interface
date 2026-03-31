@@ -1,9 +1,11 @@
 /*
  * Realtime websocket hook for room-level chat events and connection lifecycle.
  *
- * This hook opens room sockets, handles reconnect behavior, translates inbound
- * websocket events into chat reducer actions, emits typing diagnostics, and
- * exposes connect/disconnect/send helpers for chat UI components.
+ * This hook opens room sockets authenticated via ?token= JWT query param
+ * (Authorization headers cannot be sent during the WebSocket handshake),
+ * handles reconnect behavior, translates inbound websocket events into chat
+ * reducer actions, emits typing diagnostics, and exposes connect/disconnect/send
+ * helpers for chat UI components.
  */
 import { useEffect, useRef, useCallback } from "react";
 import { useChat } from "../context/ChatContext";
@@ -11,15 +13,19 @@ import { wsUrl } from "../config.js";
 
 export function useWebSocket() {
   /* Creates websocket controls and wires inbound events to global chat state. */
-  const { dispatch } = useChat();
+  const { dispatch, state } = useChat();
   const wsRef = useRef(null);
   const reconnectTimer = useRef(null);
   const skipReconnectRef = useRef(false);
   const typingTimers = useRef({});
 
-  const connect = useCallback((roomId, userId) => {
-    /* Opens a websocket for the room/user and installs message handlers. */
-    // Clean up previous
+  // Keep a ref to the current user ID so the message handler always sees the latest value
+  // without needing to be recreated when the user object changes.
+  const currentUserIdRef = useRef(state.user?.id ?? null);
+  currentUserIdRef.current = state.user?.id ?? null;
+
+  const connect = useCallback((roomId) => {
+    /* Opens a JWT-authenticated websocket for the room and installs message handlers. */
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
@@ -27,7 +33,8 @@ export function useWebSocket() {
     clearTimeout(reconnectTimer.current);
     skipReconnectRef.current = false;
 
-    const url = wsUrl(`/ws/${roomId}?user_id=${userId}`);
+    const token = localStorage.getItem("chat_token") || "";
+    const url = wsUrl(`/ws/${roomId}?token=${encodeURIComponent(token)}`);
 
     const socket = new WebSocket(url);
     wsRef.current = socket;
@@ -54,7 +61,7 @@ export function useWebSocket() {
 
         case "file":
           // Skip if this is our own upload (already added optimistically)
-          if (data.sender_id === userId) break;
+          if (data.sender_id === currentUserIdRef.current) break;
           dispatch({
             type: "ADD_MESSAGE",
             payload: {
@@ -77,7 +84,6 @@ export function useWebSocket() {
           );
           console.log("[WS] typing received from", data.user_name);
           dispatch({ type: "ADD_TYPING", payload: data.user_name });
-          // Keep indicator visible long enough to be noticeable on receiver
           clearTimeout(typingTimers.current[data.user_name]);
           typingTimers.current[data.user_name] = setTimeout(() => {
             dispatch({ type: "REMOVE_TYPING", payload: data.user_name });
@@ -91,7 +97,6 @@ export function useWebSocket() {
               detail: { direction: "in", type: "stop_typing", user: data.user_name, at: Date.now() },
             })
           );
-          // Don't remove immediately — keep visible for 3s so others can see it
           clearTimeout(typingTimers.current[data.user_name]);
           typingTimers.current[data.user_name] = setTimeout(() => {
             dispatch({ type: "REMOVE_TYPING", payload: data.user_name });
@@ -141,10 +146,10 @@ export function useWebSocket() {
 
     socket.onclose = () => {
       if (skipReconnectRef.current) return;
-      // Auto-reconnect after 3s
+      // Auto-reconnect after 3s — token is re-read from localStorage on each connect call
       reconnectTimer.current = setTimeout(() => {
         if (wsRef.current === socket) {
-          connect(roomId, userId);
+          connect(roomId);
         }
       }, 3000);
     };

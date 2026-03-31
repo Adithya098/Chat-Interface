@@ -22,9 +22,10 @@ export default function JoinModal({ room, onClose, onJoined }) {
     setError("");
     setLoading(true);
     try {
+      // user_id is resolved from the JWT on the backend — only role in body
       await api(`/rooms/${room.id}/join`, {
         method: "POST",
-        body: JSON.stringify({ user_id: state.user.id, role }),
+        body: JSON.stringify({ role }),
       });
       setSent(true);
       onJoined();

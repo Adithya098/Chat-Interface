@@ -35,14 +35,14 @@ export default function ChatArea() {
   const typingHeartbeatRef = useRef(0);
   const isTypingRef = useRef(false);
 
-  // Connect WS when active room changes
+  // Connect WS when active room changes — user identity comes from the JWT, not a param
   useEffect(() => {
     if (activeRoom && user) {
       api(`/rooms/${activeRoom.id}/messages/?limit=100`)
         .then((msgs) => dispatch({ type: "SET_MESSAGES", payload: msgs }))
         .catch(console.error);
 
-      connect(activeRoom.id, user.id);
+      connect(activeRoom.id);
       return () => disconnect();
     }
   }, [activeRoom?.id, user?.id]);
@@ -145,7 +145,8 @@ export default function ChatArea() {
       return;
     }
     try {
-      const data = await uploadFile(activeRoom.id, user.id, file);
+      // userId is no longer sent — the backend reads it from the JWT
+      const data = await uploadFile(activeRoom.id, file);
 
       // Optimistic local update — show the message immediately
       dispatch({
@@ -180,8 +181,9 @@ export default function ChatArea() {
       if (!activeRoom || !user) return;
       if (!await showConfirm("Delete this message for everyone in the room?")) return;
       try {
+        // admin_id is no longer sent — the backend reads it from the JWT
         await api(
-          `/rooms/${activeRoom.id}/messages/${messageId}?admin_id=${user.id}`,
+          `/rooms/${activeRoom.id}/messages/${messageId}`,
           { method: "DELETE" }
         );
         dispatch({ type: "REMOVE_MESSAGE", payload: messageId });
@@ -226,8 +228,9 @@ export default function ChatArea() {
     if (!await showConfirm(`Leave "${activeRoom.name}"?`)) return;
 
     try {
+      // user_id is no longer sent — the backend reads it from the JWT
       await api(
-        `/rooms/${activeRoom.id}/leave?user_id=${user.id}`,
+        `/rooms/${activeRoom.id}/leave`,
         { method: "POST" }
       );
       dispatch({ type: "SET_ACTIVE_ROOM", payload: null });
@@ -251,7 +254,6 @@ export default function ChatArea() {
   const canWrite = activeRoom.role === "write" || activeRoom.role === "admin";
   const isAdmin = activeRoom.role === "admin";
   const typingNames = Object.keys(typingUsers);
-  const typingDebugText = typingNames.length ? typingNames.join(", ") : "none";
   const typingLabel =
     typingNames.length === 1
       ? `${typingNames[0]} is typing...`
@@ -264,13 +266,6 @@ export default function ChatArea() {
   return (
     <main className="chat-area">
       <div className="chat-view">
-        {/* Debug panel - disabled */}
-        {/* <div className="typing-debug-panel">
-          <div>self user: {user?.name || user?.id || "unknown"}</div>
-          <div>typingUsers: {typingDebugText}</div>
-          <div>ws IN: {wsTypingInDebug}</div>
-        </div> */}
-
         {/* Header */}
         <div className="chat-header">
           <button
@@ -303,7 +298,7 @@ export default function ChatArea() {
           </div>
         </div>
 
-        {/* Typing bar — always rendered below header, empty when nobody typing */}
+        {/* Typing bar */}
         <div className="typing-bar">
           {typingLabel ? (
             <>
@@ -364,15 +359,15 @@ export default function ChatArea() {
                   onChange={handleFileUpload}
                 />
               </label>
-              <input
+              <textarea
                 ref={messageInputRef}
-                type="text"
                 className="message-input"
                 placeholder={replyingTo ? "Type your reply..." : "Type a message..."}
                 value={text}
                 onChange={handleInputChange}
                 onBlur={handleInputBlur}
                 onKeyDown={handleKeyDown}
+                rows={1}
               />
               <button className="send-btn" onClick={handleSend}>
                 Send
@@ -397,6 +392,13 @@ export default function ChatArea() {
 function MessageBubble({ msg, userId, isAdmin, canWrite, onDelete, onReply, onClickReply }) {
   /* Renders one chat message row, including reply quote and action buttons. */
   const [expanded, setExpanded] = useState(false);
+
+  // Build an authenticated media URL by embedding the JWT as a query param.
+  // <img src> and <audio src> cannot send Authorization headers, so ?token= is the fallback.
+  function mediaUrl(path) {
+    const token = localStorage.getItem("chat_token") || "";
+    return `${API_BASE}${path}?token=${encodeURIComponent(token)}`;
+  }
 
   if (msg.type === "system") {
     return <div className="msg-system">{msg.content}</div>;
@@ -430,7 +432,7 @@ function MessageBubble({ msg, userId, isAdmin, canWrite, onDelete, onReply, onCl
               {msg.reply_snippet.is_image && msg.reply_snippet.file_url ? (
                 <img
                   className="reply-quote-image"
-                  src={`${API_BASE}${msg.reply_snippet.file_url}?user_id=${userId}`}
+                  src={mediaUrl(msg.reply_snippet.file_url)}
                   alt={msg.reply_snippet.filename || "Replied image"}
                   loading="lazy"
                 />
@@ -441,7 +443,7 @@ function MessageBubble({ msg, userId, isAdmin, canWrite, onDelete, onReply, onCl
 
           {msg.type === "file" ? (
             (() => {
-              const url = `${API_BASE}${msg.content}?user_id=${userId}`;
+              const url = mediaUrl(msg.content);
               const name = (msg.filename || "").toLowerCase();
               const ext = name.slice(name.lastIndexOf("."));
               const imageExts = [".png", ".jpg", ".jpeg", ".gif"];
@@ -512,7 +514,6 @@ function MessageBubble({ msg, userId, isAdmin, canWrite, onDelete, onReply, onCl
                 );
               }
 
-              // Documents and other files
               return (
                 <div className="file-attachment">
                   <div className="file-attachment-name">{msg.filename || "Attachment"}</div>

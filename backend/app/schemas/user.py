@@ -38,3 +38,9 @@ class UserResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class AuthResponse(BaseModel):
+    """Response returned by login and signup — includes the JWT and user profile."""
+    token: str
+    user: UserResponse

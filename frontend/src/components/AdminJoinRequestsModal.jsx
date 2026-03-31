@@ -42,9 +42,10 @@ export default function AdminJoinRequestsModal({ bundles, user, onClose, onChang
   const handleAction = async (roomId, targetUserId, action) => {
     /* Sends approve/reject action for a target user in a specific room. */
     try {
+      // admin identity comes from the JWT — only target user_id in body
       await api(`/rooms/${roomId}/${action}`, {
         method: "POST",
-        body: JSON.stringify({ admin_id: user.id, user_id: targetUserId }),
+        body: JSON.stringify({ user_id: targetUserId }),
       });
       onChanged();
     } catch (err) {

@@ -1,17 +1,19 @@
 """Realtime websocket endpoint for room chat event handling.
 
-This module authenticates websocket users against approved room membership, 
-manages connect/disconnect presence updates, receives message/typing/file events from clients, 
+This module authenticates websocket users via a ?token= JWT query parameter
+(Authorization headers are unavailable after the WebSocket upgrade),
+manages connect/disconnect presence updates, receives message/typing/file events from clients,
 persists chat messages, broadcasts payloads to room participants, and cleans up connection state on disconnect/errors."""
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy.orm import Session
-from app.database import get_db, SessionLocal
+from app.database import SessionLocal
 from app.models.room_member import RoomMember
 from app.models.user import User
 from app.models.message import Message
 from app.models.document import Document
 from app.connection_manager import manager
+from app.auth import _decode_token
 
 router = APIRouter(tags=["websocket"])
 _DOC_PREFIX = "/documents/"
@@ -22,7 +24,7 @@ def _file_id_from_message_content(content: str) -> str | None:
     """Extracts document file ID from a /documents/<id> message content path."""
     if not content.startswith(_DOC_PREFIX):
         return None
-    rest = content[len(_DOC_PREFIX) :].split("?")[0].strip("/")
+    rest = content[len(_DOC_PREFIX):].split("?")[0].strip("/")
     return rest or None
 
 
@@ -40,11 +42,10 @@ def _is_image_filename(filename: str | None) -> bool:
 async def websocket_endpoint(
     websocket: WebSocket,
     room_id: int,
-    user_id: int = Query(...),
+    token: str | None = Query(default=None),
 ):
-    """Handles websocket lifecycle for a room member, including auth checks and message fanout."""
-    # Get a DB session for auth checks
-    db = SessionLocal()
+    """Handles websocket lifecycle for a room member, authenticating via ?token= JWT."""
+    db: Session = SessionLocal()
     accepted = False
 
     try:
@@ -52,13 +53,23 @@ async def websocket_endpoint(
         await websocket.accept()
         accepted = True
 
-        # 1. Verify user exists
+        # 1. Validate JWT token
+        if not token:
+            await websocket.close(code=4001, reason="Authentication required")
+            return
+
+        user_id = _decode_token(token)
+        if user_id is None:
+            await websocket.close(code=4001, reason="Invalid or expired token")
+            return
+
+        # 2. Verify user exists
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             await websocket.close(code=4001, reason="User not found")
             return
 
-        # 2. Verify user is an approved member of this room
+        # 3. Verify user is an approved member of this room
         member = db.query(RoomMember).filter(
             RoomMember.room_id == room_id,
             RoomMember.user_id == user_id,
@@ -70,10 +81,10 @@ async def websocket_endpoint(
 
         user_name = user.name
 
-        # 3. Connect
+        # 4. Connect
         await manager.connect(room_id, user_id, websocket)
 
-        # 4. Broadcast online users list to everyone in the room
+        # 5. Broadcast online users list to everyone in the room
         online = manager.get_online_users(room_id)
         await manager.broadcast(room_id, {
             "type": "online_users",
@@ -88,29 +99,29 @@ async def websocket_endpoint(
 
     db.close()
 
-    # 5. Listen for messages
+    # 6. Listen for messages
     try:
         while True:
             data = await websocket.receive_json()
             msg_type = data.get("type")
 
             if msg_type == "message":
-                role = member.role
-                if role not in ("write", "admin"):
+                if member.role not in ("write", "admin"):
                     await manager.send_to_user(room_id, user_id, {
                         "type": "error",
                         "content": "You don't have write permission in this room",
                     })
                     continue
 
-                # Save message to DB
                 msg_db = SessionLocal()
                 try:
                     reply_to_id = data.get("reply_to")
-                    # Build reply snippet if replying
                     reply_snippet = None
                     if reply_to_id is not None:
-                        orig = msg_db.query(Message).filter(Message.id == reply_to_id).first()
+                        orig = msg_db.query(Message).filter(
+                            Message.id == reply_to_id,
+                            Message.room_id == room_id,
+                        ).first()
                         if orig:
                             orig_user = msg_db.query(User).filter(User.id == orig.sender_id).first()
                             filename = None
@@ -135,19 +146,22 @@ async def websocket_endpoint(
                                 "is_image": is_image,
                             }
 
+                    content = data.get("content", "").strip()
+                    if not content:
+                        continue
+
                     db_msg = Message(
                         room_id=room_id,
                         sender_id=user_id,
                         type="text",
-                        content=data.get("content", ""),
+                        content=content,
                         reply_to=reply_to_id,
                     )
                     msg_db.add(db_msg)
                     msg_db.commit()
                     msg_db.refresh(db_msg)
 
-                    # Broadcast with DB id and timestamp
-                    broadcast_payload = {
+                    await manager.broadcast(room_id, {
                         "type": "message",
                         "id": db_msg.id,
                         "sender_id": user_id,
@@ -156,13 +170,11 @@ async def websocket_endpoint(
                         "created_at": db_msg.created_at.isoformat(),
                         "reply_to": reply_to_id,
                         "reply_snippet": reply_snippet,
-                    }
-                    await manager.broadcast(room_id, broadcast_payload)
+                    })
                 finally:
                     msg_db.close()
 
             elif msg_type == "typing":
-                # print(f"[WS][typing-in] room={room_id} user_id={user_id} user_name={user_name}", flush=True)
                 await manager.broadcast(room_id, {
                     "type": "typing",
                     "user_id": user_id,
@@ -170,7 +182,6 @@ async def websocket_endpoint(
                 }, exclude_websocket=websocket)
 
             elif msg_type == "stop_typing":
-                # print(f"[WS][stop-typing-in] room={room_id} user_id={user_id} user_name={user_name}", flush=True)
                 await manager.broadcast(room_id, {
                     "type": "stop_typing",
                     "user_id": user_id,
@@ -178,23 +189,38 @@ async def websocket_endpoint(
                 }, exclude_websocket=websocket)
 
             elif msg_type == "file":
-                # Client sends this after REST upload to notify the room
-                # {"type": "file", "file_url": "/documents/<file_id>", "filename": "<original name>", "message_id": 5}
-                role = member.role
-                if role not in ("write", "admin"):
+                if member.role not in ("write", "admin"):
                     await manager.send_to_user(room_id, user_id, {
                         "type": "error",
                         "content": "You don't have write permission in this room",
                     })
                     continue
 
+                message_id = data.get("message_id")
+                file_url = data.get("file_url", "")
+                filename = data.get("filename", "")
+
+                # Verify the message_id belongs to this room and this sender
+                if message_id is not None:
+                    msg_db = SessionLocal()
+                    try:
+                        db_msg = msg_db.query(Message).filter(
+                            Message.id == message_id,
+                            Message.room_id == room_id,
+                            Message.sender_id == user_id,
+                        ).first()
+                        if not db_msg:
+                            continue
+                    finally:
+                        msg_db.close()
+
                 await manager.broadcast(room_id, {
                     "type": "file",
-                    "id": data.get("message_id"),
+                    "id": message_id,
                     "sender_id": user_id,
                     "sender_name": user_name,
-                    "file_url": data.get("file_url", ""),
-                    "filename": data.get("filename", ""),
+                    "file_url": file_url,
+                    "filename": filename,
                 })
 
     except WebSocketDisconnect:
@@ -204,11 +230,6 @@ async def websocket_endpoint(
             "user_id": user_id,
             "user_name": user_name,
         })
-        # User left notification (disabled)
-        # await manager.broadcast(room_id, {
-        #     "type": "system",
-        #     "content": f"User {user_id} left the room",
-        # })
         online = manager.get_online_users(room_id)
         await manager.broadcast(room_id, {
             "type": "online_users",

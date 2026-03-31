@@ -75,8 +75,9 @@ export default function MembersPanel({ onClose }) {
     if (!activeRoom || !user) return;
     if (!await showConfirm("Remove this member from the room?")) return;
     try {
+      // admin identity comes from the JWT — no admin_id param needed
       await api(
-        `/rooms/${activeRoom.id}/members/${targetUserId}?admin_id=${user.id}`,
+        `/rooms/${activeRoom.id}/members/${targetUserId}`,
         { method: "DELETE" }
       );
       loadMembers();
@@ -90,9 +91,10 @@ export default function MembersPanel({ onClose }) {
     if (!activeRoom || !user) return;
     if (!await showConfirm("Promote this member to admin?")) return;
     try {
+      // admin identity comes from the JWT — only target user_id in body
       await api(`/rooms/${activeRoom.id}/promote`, {
         method: "POST",
-        body: JSON.stringify({ admin_id: user.id, user_id: targetUserId }),
+        body: JSON.stringify({ user_id: targetUserId }),
       });
       loadMembers();
     } catch (err) {
@@ -103,9 +105,10 @@ export default function MembersPanel({ onClose }) {
   const handleAction = async (userId, action) => {
     /* Applies admin approve/reject action for a pending join request. */
     try {
+      // admin identity comes from the JWT — only target user_id in body
       await api(`/rooms/${activeRoom.id}/${action}`, {
         method: "POST",
-        body: JSON.stringify({ admin_id: user.id, user_id: userId }),
+        body: JSON.stringify({ user_id: userId }),
       });
       loadMembers();
     } catch (err) {

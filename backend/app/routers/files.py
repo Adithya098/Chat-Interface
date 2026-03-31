@@ -1,14 +1,18 @@
 """File upload and document access endpoints with authorization and storage fallback logic.
 
-This module validates room membership and write permissions, enforces file extension/size constraints, 
-stores uploads in Supabase Storage or local disk fallback, creates corresponding document/message records, 
-lists room documents, and serves or redirects secure document downloads."""
+This module validates room membership and write permissions, enforces file extension/size constraints,
+stores uploads in Supabase Storage or local disk fallback, creates corresponding document/message records,
+lists room documents, and serves or redirects secure document downloads.
+
+All endpoints require a valid JWT. User identity is extracted from the token.
+The /documents/{file_id} endpoint additionally accepts ?token= as a query param
+so that browser <img>, <audio>, and <video> tags can load media without custom headers."""
 
 import logging
 import os
 import uuid
 import mimetypes
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from storage3.exceptions import StorageApiError
@@ -18,7 +22,9 @@ from app.models.room import Room
 from app.models.room_member import RoomMember
 from app.models.message import Message
 from app.models.document import Document
+from app.models.user import User
 from app import supabase_storage
+from app.auth import get_current_user, get_current_user_flexible
 
 router = APIRouter(tags=["files"])
 logger = logging.getLogger(__name__)
@@ -26,9 +32,7 @@ logger = logging.getLogger(__name__)
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
 ALLOWED_EXTENSIONS = {
     ".png", ".jpg", ".jpeg", ".gif", ".pdf", ".txt", ".doc", ".docx", ".csv", ".zip",
-    # audio
     ".mp3", ".wav", ".ogg", ".m4a", ".flac", ".aac",
-    # video
     ".mp4", ".webm", ".mov", ".avi", ".mkv",
 }
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
@@ -54,16 +58,16 @@ def _approved_room_member(db: Session, room_id: int, user_id: int, need_write: b
 @router.post("/rooms/{room_id}/upload")
 def upload_file(
     room_id: int,
-    user_id: int = Form(...),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Validates and stores an uploaded file, then creates a file-type chat message record."""
     room = db.query(Room).filter(Room.id == room_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
 
-    if not _approved_room_member(db, room_id, user_id, need_write=True):
+    if not _approved_room_member(db, room_id, current_user.id, need_write=True):
         raise HTTPException(status_code=403, detail="Not authorized to upload in this room")
 
     original_name = file.filename or "upload"
@@ -112,7 +116,7 @@ def upload_file(
     doc = Document(
         file_id=file_id,
         room_id=room_id,
-        sender_id=user_id,
+        sender_id=current_user.id,
         original_filename=original_name,
         storage_bucket=storage_bucket,
         storage_path=storage_path,
@@ -124,7 +128,7 @@ def upload_file(
     file_url = f"/documents/{file_id}"
     db_msg = Message(
         room_id=room_id,
-        sender_id=user_id,
+        sender_id=current_user.id,
         type="file",
         content=file_url,
     )
@@ -149,13 +153,13 @@ def upload_file(
 @router.get("/rooms/{room_id}/documents")
 def list_room_documents(
     room_id: int,
-    user_id: int = Query(..., description="User requesting the list (must be an approved member)"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """Lists uploaded documents in a room for authorized members with access URLs."""
+    """Lists uploaded documents in a room — caller must be an approved member."""
     if not db.query(Room).filter(Room.id == room_id).first():
         raise HTTPException(status_code=404, detail="Room not found")
-    if not _approved_room_member(db, room_id, user_id, need_write=False):
+    if not _approved_room_member(db, room_id, current_user.id, need_write=False):
         raise HTTPException(status_code=403, detail="Not a member of this room")
 
     rows = (
@@ -182,22 +186,25 @@ def list_room_documents(
 @router.get("/documents/{file_id}")
 def open_document(
     file_id: str,
-    user_id: int = Query(..., description="User opening the file (must be an approved member)"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_flexible),
 ):
-    """Opens a document by redirecting to signed storage URL or streaming local file content."""
+    """Opens a document — accepts Authorization: Bearer header OR ?token= query param.
+
+    The ?token= fallback allows browser <img>/<audio>/<video> src attributes to load
+    media without custom headers."""
     doc = db.query(Document).filter(Document.file_id == file_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    if not _approved_room_member(db, doc.room_id, user_id, need_write=False):
+    if not _approved_room_member(db, doc.room_id, current_user.id, need_write=False):
         raise HTTPException(status_code=403, detail="Not authorized to open this document")
 
     if doc.storage_bucket and doc.storage_path:
         if not _use_supabase_storage():
             raise HTTPException(
                 status_code=503,
-                detail="File is in Supabase Storage but SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / bucket are not configured",
+                detail="File is in Supabase Storage but credentials are not configured",
             )
         expires = int(os.getenv("SUPABASE_SIGNED_URL_EXPIRES_SECONDS", "3600"))
         try:
@@ -224,8 +231,11 @@ def open_document(
 
 
 @router.get("/files/{filename}")
-def get_file(filename: str):
-    """Serves legacy locally stored uploads addressed by direct filename."""
+def get_file(
+    filename: str,
+    _: User = Depends(get_current_user),
+):
+    """Serves legacy locally stored uploads by filename — requires a valid JWT."""
     file_path = os.path.join(UPLOAD_DIR, filename)
     if not os.path.isfile(file_path):
         raise HTTPException(status_code=404, detail="File not found")
