@@ -15,11 +15,11 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      '/users':     proxyToApi,
-      '/rooms':     proxyToApi,
+      '/users': proxyToApi,
+      '/rooms': proxyToApi,
       '/documents': proxyToApi,
-      '/files':     proxyToApi,
-      '/health':    proxyToApi,
+      '/files': proxyToApi,
+      '/health': proxyToApi,
       '/db_health': proxyToApi,
     },
   },
