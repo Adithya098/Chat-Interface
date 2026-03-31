@@ -106,7 +106,27 @@ async def websocket_endpoint(
             msg_type = data.get("type")
 
             if msg_type == "message":
-                if member.role not in ("write", "admin"):
+                # Re-query membership on every message to catch role changes or kicks
+                # that occurred after the WebSocket was established (stale-session fix).
+                event_db = SessionLocal()
+                try:
+                    live_member = event_db.query(RoomMember).filter(
+                        RoomMember.room_id == room_id,
+                        RoomMember.user_id == user_id,
+                        RoomMember.status == "approved",
+                    ).first()
+                finally:
+                    event_db.close()
+
+                if not live_member:
+                    await manager.send_to_user(room_id, user_id, {
+                        "type": "kicked",
+                        "content": "Your membership in this room has been revoked",
+                    })
+                    manager.disconnect(room_id, user_id, websocket)
+                    return
+
+                if live_member.role not in ("write", "admin"):
                     await manager.send_to_user(room_id, user_id, {
                         "type": "error",
                         "content": "You don't have write permission in this room",
@@ -189,7 +209,26 @@ async def websocket_endpoint(
                 }, exclude_websocket=websocket)
 
             elif msg_type == "file":
-                if member.role not in ("write", "admin"):
+                # Re-query membership on every file event (same stale-session fix).
+                event_db = SessionLocal()
+                try:
+                    live_member = event_db.query(RoomMember).filter(
+                        RoomMember.room_id == room_id,
+                        RoomMember.user_id == user_id,
+                        RoomMember.status == "approved",
+                    ).first()
+                finally:
+                    event_db.close()
+
+                if not live_member:
+                    await manager.send_to_user(room_id, user_id, {
+                        "type": "kicked",
+                        "content": "Your membership in this room has been revoked",
+                    })
+                    manager.disconnect(room_id, user_id, websocket)
+                    return
+
+                if live_member.role not in ("write", "admin"):
                     await manager.send_to_user(room_id, user_id, {
                         "type": "error",
                         "content": "You don't have write permission in this room",

@@ -214,7 +214,7 @@ The token is returned by `/users/login` and `/users/signup`.
 3. All REST calls:  Authorization: Bearer <token>
 4. WebSocket:       ws://.../ws/{room_id}?token=<token>
 5. Media URLs:      /documents/{file_id}?token=<token>
-6. Token expires after 7 days → 401 response → auto-logout + redirect to login
+6. Token expires after 30 days → 401 response → auto-logout + redirect to login
 ```
 
 ---
